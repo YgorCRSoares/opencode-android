@@ -1,0 +1,7 @@
+build/
+.gradle/
+local.properties
+*.log
+.idea/
+*.iml
+app/src/main/assets/runtime-arm64.zip
