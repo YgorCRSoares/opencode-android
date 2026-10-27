@@ -31,6 +31,9 @@ public class RuntimeInstallerTest {
     private static final String ENTRY_SHARE = "share/banner.txt";
     private static final String CONTENT_BIN = "conteudo-binario-v1\n";
     private static final String CONTENT_SHARE = "banner do runtime\n";
+    private static final String ENTRY_PADRAO = "share/padrao.txt";
+    /** Altamente compressível: descomprimido ≫ comprimido no zip. */
+    private static final String CONTEUDO_GRANDE = "a".repeat(64 * 1024);
     private static final String MARKER = ".extracted_marker";
 
     @Rule
@@ -54,13 +57,13 @@ public class RuntimeInstallerTest {
         assertEquals("dados do usuario\n", read(new File(baseDir, "home/user.txt")));
 
         assertFalse("listener deve ser chamado durante a extracao", listener.calls.isEmpty());
-        long esperado = CONTENT_BIN.getBytes(StandardCharsets.UTF_8).length
-                + CONTENT_SHARE.getBytes(StandardCharsets.UTF_8).length;
         for (long[] call : listener.calls) {
             assertEquals("totalBytes repassado ao listener", zip.length, call[1]);
+            // bytesExtracted conta os bytes COMPRIMIDOS lidos de `zip` — mesma unidade
+            // de totalBytes, para o consumidor dividir sem estourar 100%
+            assertTrue("bytesExtracted comprimido: 0 < " + call[0] + " <= " + call[1],
+                    call[0] > 0 && call[0] <= call[1]);
         }
-        long[] ultima = listener.calls.get(listener.calls.size() - 1);
-        assertEquals("bytesExtracted acumulado", esperado, ultima[0]);
     }
 
     @Test
@@ -125,6 +128,34 @@ public class RuntimeInstallerTest {
         assertEquals(VERSION, read(new File(baseDir, MARKER)));
     }
 
+    /**
+     * Os dois argumentos do listener precisam ser conmensuráveis: o consumidor (Task 10)
+     * passa o tamanho COMPRIMIDO do asset como totalBytes e divide os dois. Contando bytes
+     * descomprimidos, o progresso estouraria 100% antes do fim do zip.
+     */
+    @Test
+    public void listenerProgressUsesCompressedBytes() throws Exception {
+        File baseDir = temporaryFolder.newFolder("files");
+        byte[] zip = zipCompressivel();
+        // Garante que o teste discrimina: descomprimido ≫ comprimido neste fixture
+        assertTrue("fixture: descomprimido deve exceder o tamanho comprimido do zip",
+                CONTEUDO_GRANDE.length() > zip.length);
+
+        RecordingListener listener = new RecordingListener();
+        RuntimeInstaller.install(baseDir, new ByteArrayInputStream(zip), zip.length, VERSION,
+                listener);
+
+        assertFalse(listener.calls.isEmpty());
+        long anterior = 0;
+        for (long[] call : listener.calls) {
+            assertEquals("totalBytes e o tamanho comprimido do zip", zip.length, call[1]);
+            assertTrue("bytesExtracted deve ser comprimido: 0 < " + call[0] + " <= " + call[1],
+                    call[0] > 0 && call[0] <= call[1]);
+            assertTrue("progresso monotono", call[0] >= anterior);
+            anterior = call[0];
+        }
+    }
+
     // -- fixtures --
 
     /** Zip pequeno com 2 entries em diretorios ainda inexistentes. */
@@ -134,6 +165,19 @@ public class RuntimeInstallerTest {
             try (ZipOutputStream zip = new ZipOutputStream(bytes)) {
                 writeEntry(zip, ENTRY_BIN, CONTENT_BIN);
                 writeEntry(zip, ENTRY_SHARE, CONTENT_SHARE);
+            }
+            return bytes.toByteArray();
+        } catch (IOException e) {
+            throw new AssertionError("falha ao montar fixture de zip", e);
+        }
+    }
+
+    /** Zip com conteúdo altamente compressível — descomprimido bem maior que o arquivo. */
+    private static byte[] zipCompressivel() {
+        try {
+            ByteArrayOutputStream bytes = new ByteArrayOutputStream();
+            try (ZipOutputStream zip = new ZipOutputStream(bytes)) {
+                writeEntry(zip, ENTRY_PADRAO, CONTEUDO_GRANDE);
             }
             return bytes.toByteArray();
         } catch (IOException e) {

@@ -3,6 +3,7 @@ package dev.opencode.terminal;
 import java.io.BufferedOutputStream;
 import java.io.File;
 import java.io.FileOutputStream;
+import java.io.FilterInputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
@@ -22,7 +23,14 @@ public final class RuntimeInstaller {
     /** Arquivo em {@code baseDir} que registra a versão já extraída. */
     private static final String MARKER_NAME = ".extracted_marker";
 
-    /** Progresso acumulado da extração. */
+    /**
+     * Progresso da extração.
+     *
+     * <p>Ambos os argumentos são <strong>bytes comprimidos</strong>: {@code bytesExtracted}
+     * conta o que já foi lido de {@code zip} e {@code totalBytes} é o tamanho comprimido
+     * total (na Task 10, o tamanho do asset). Assim o consumidor pode dividir os dois
+     * sem estourar 100%.
+     */
     public interface ProgressListener {
         void onProgress(long bytesExtracted, long totalBytes);
     }
@@ -64,8 +72,8 @@ public final class RuntimeInstaller {
             throw new IOException("não foi possível criar " + baseDir);
         }
         String raiz = baseDir.getCanonicalPath();
-        long bytesExtracted = 0;
-        try (ZipInputStream entries = new ZipInputStream(zip)) {
+        CountingInputStream contador = new CountingInputStream(zip);
+        try (ZipInputStream entries = new ZipInputStream(contador)) {
             byte[] buffer = new byte[8192];
             ZipEntry entry;
             while ((entry = entries.getNextEntry()) != null) {
@@ -88,11 +96,44 @@ public final class RuntimeInstaller {
                     int lido;
                     while ((lido = entries.read(buffer)) != -1) {
                         out.write(buffer, 0, lido);
-                        bytesExtracted += lido;
-                        listener.onProgress(bytesExtracted, totalBytes);
+                        listener.onProgress(contador.getCount(), totalBytes);
                     }
                 }
             }
+        }
+    }
+
+    /**
+     * Conta os bytes comprimidos lidos do stream do chamador, para que
+     * {@code bytesExtracted} e {@code totalBytes} fiquem na mesma unidade.
+     */
+    private static final class CountingInputStream extends FilterInputStream {
+        private long count;
+
+        private CountingInputStream(InputStream in) {
+            super(in);
+        }
+
+        @Override
+        public int read() throws IOException {
+            int b = in.read();
+            if (b != -1) {
+                count++;
+            }
+            return b;
+        }
+
+        @Override
+        public int read(byte[] b, int off, int len) throws IOException {
+            int n = in.read(b, off, len);
+            if (n > 0) {
+                count += n;
+            }
+            return n;
+        }
+
+        private long getCount() {
+            return count;
         }
     }
 
