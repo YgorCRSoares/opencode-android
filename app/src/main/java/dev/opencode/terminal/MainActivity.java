@@ -3,6 +3,7 @@ package dev.opencode.terminal;
 import android.app.Activity;
 import android.os.Bundle;
 import android.widget.FrameLayout;
+import android.view.Gravity;
 
 /**
  * Task 6: shell interativo no AVD (spec T1).
@@ -29,6 +30,14 @@ public class MainActivity extends Activity {
                 new String[] { "/system/bin/sh" },
                 EnvBuilder.build(getFilesDir(), null, null),
                 null /* cwd: ignorado pelo TermExec (sem chdir) */);
+
+        // Linha de teclas especiais acima do teclado.
+        ExtraKeysView extraKeys = new ExtraKeysView(this, mTerm);
+        FrameLayout.LayoutParams lp = new FrameLayout.LayoutParams(
+                FrameLayout.LayoutParams.MATCH_PARENT,
+                FrameLayout.LayoutParams.WRAP_CONTENT,
+                Gravity.BOTTOM);
+        container.addView(extraKeys, lp);
     }
 
     @Override

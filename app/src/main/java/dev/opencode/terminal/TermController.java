@@ -14,6 +14,7 @@ import android.widget.TextView;
 import java.io.File;
 import java.io.IOException;
 import java.util.Map;
+import java.io.OutputStream;
 
 import jackpal.androidterm.TermExec;
 import jackpal.androidterm.emulatorview.EmulatorView;
@@ -31,6 +32,7 @@ public final class TermController {
     private TermSession mSession;
     private EmulatorView mView;
     private ParcelFileDescriptor mPtmx;
+    private ParcelFileDescriptor.AutoCloseOutputStream mOutput;
     private Runnable mSessionEndListener;
     private boolean mStarted;
 
@@ -82,9 +84,10 @@ public final class TermController {
             throw new IllegalStateException("Não foi possível abrir /dev/ptmx", e);
         }
 
+        mOutput = new ParcelFileDescriptor.AutoCloseOutputStream(mPtmx);
         TermSession session = new TermSession(false);
         session.setTermIn(new ParcelFileDescriptor.AutoCloseInputStream(mPtmx));
-        session.setTermOut(new ParcelFileDescriptor.AutoCloseOutputStream(mPtmx));
+        session.setTermOut(mOutput);
         mSession = session;
 
         DisplayMetrics metrics = new DisplayMetrics();
@@ -120,6 +123,27 @@ public final class TermController {
 
     public void setOnSessionEndListener(Runnable listener) {
         mSessionEndListener = listener;
+    }
+
+    /**
+     * Raw PTY master output stream used by the extra-keys row to inject bytes.
+     * Returns {@code null} until {@link #start} has been called. Callers must
+     * guard against {@code null}. The stream is owned by this controller; do
+     * NOT close it from outside.
+     */
+    public OutputStream outputStream() {
+        return mOutput;
+    }
+
+    /**
+     * Arms the terminal's built-in Ctrl modifier (one-shot): the next character
+     * typed by the IME is converted to its control equivalent. Used by the
+     * extra-keys row's Ctrl button.
+     */
+    public void sendCtrl() {
+        if (mView != null) {
+            mView.sendControlKey();
+        }
     }
 
     public void onResume() {
