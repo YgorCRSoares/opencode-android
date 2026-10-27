@@ -14,3 +14,6 @@ dependencyResolutionManagement {
 }
 rootProject.name = "opencode-android"
 include(":app")
+// Emulatorview vendorizado (jackpal) — ver vendor/emulatorview/VENDORED.md.
+include(":emulatorview")
+project(":emulatorview").projectDir = file("vendor/emulatorview")

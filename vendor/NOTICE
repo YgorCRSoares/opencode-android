@@ -13,3 +13,11 @@ the upstream sources include:
   Copyright (C) 2012 Steven Luo   (libtermexec/src/main/jni/process.{cpp,h})
   Copyright (c) 2005-2008, The Android Open Source Project
                                   (as listed in the upstream NOTICE file)
+
+This product also includes software from the emulatorview module of the same
+project (https://github.com/jackpal/Android-Terminal-Emulator), vendored under
+vendor/emulatorview/ at the same upstream commit
+35188f8a8b57989a4a4ec9485e11187b46be26d9, licensed under the Apache License,
+Version 2.0 (see vendor/LICENSE-jackpal.txt). The upstream NOTICE file includes:
+
+  Copyright (c) 2005-2008, The Android Open Source Project

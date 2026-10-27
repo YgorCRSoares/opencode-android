@@ -46,5 +46,7 @@ android {
 }
 
 dependencies {
+    // Terminal VT100/xterm vendorizado (jackpal) — ver vendor/emulatorview/VENDORED.md.
+    implementation(project(":emulatorview"))
     testImplementation("junit:junit:4.13.2")
 }
