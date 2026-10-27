@@ -19,6 +19,20 @@ android {
         }
     }
 
+    // Vendored jackpal libtermexec (PTY): Java API + JNI C sources.
+    // See vendor/libtermexec/VENDORED.md.
+    sourceSets {
+        getByName("main") {
+            java.srcDir(rootProject.file("vendor/libtermexec/src/main/java"))
+        }
+    }
+
+    externalNativeBuild {
+        ndkBuild {
+            path = rootProject.file("vendor/libtermexec/src/main/jni/Android.mk")
+        }
+    }
+
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17
