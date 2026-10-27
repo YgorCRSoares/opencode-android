@@ -52,6 +52,20 @@ public final class TermController {
                 Gravity.CENTER));
     }
 
+    /**
+     * Spawns the terminal child process and wires it to the EmulatorView.
+     *
+     * @param argv command line (argv[0] is the program)
+     * @param env  environment variables to apply; {@code null} means default
+     * @param cwd  requested working directory.
+     *             <strong>Currently ignored.</strong> Upstream {@code jackpal.termexec.TermExec}
+     *             spawns via {@code execv} which inherits the parent process working
+     *             directory; there is no chdir support in TermExec (nor in this
+     *             wrapper). The parameter is retained for the Task 7 / Task 10
+     *             public API so callers can pass a directory without breaking
+     *             compatibility, but wiring it must wait for upstream to gain
+     *             chdir support — do not invent native chdir here.
+     */
     public void start(String[] argv, Map<String, String> env, File cwd) {
         if (mStarted) {
             throw new IllegalStateException("TermController é de uso único");
