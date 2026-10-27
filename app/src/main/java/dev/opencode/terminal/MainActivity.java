@@ -23,7 +23,12 @@ public class MainActivity extends Activity {
     private static final String TAG = "MainActivity";
     private static final int REQ_SETUP = 1;
     private static final String ASSET_NAME = "runtime-arm64.zip";
-    private static final String RUNTIME_VERSION = "1.0";
+    /**
+     * Versão gravada em {@code .extracted_marker} pelo {@link RuntimeInstaller}.
+     * Ancorada ao {@code versionName} do build; mantida aqui como literal
+     * enquanto {@code buildConfig} não é gerado pelo AGP (ver build.gradle.kts).
+     */
+    private static final String RUNTIME_MARKER_VERSION = "1.0";
 
     private FrameLayout mContainer;
     private TermController mTerm;
@@ -54,20 +59,18 @@ public class MainActivity extends Activity {
         progress.setCancelable(false);
 
         RuntimeInstaller.InstallResult result;
-        try {
-            AssetHandle asset = openAsset();
+        try (AssetHandle asset = openAsset()) {
             progress.show();
             result = RuntimeInstaller.install(
                     getFilesDir(),
                     asset.stream,
                     asset.length,
-                    RUNTIME_VERSION,
+                    RUNTIME_MARKER_VERSION,
                     (bytesExtracted, totalBytes) -> {
                         if (totalBytes > 0) {
                             progress.setProgress((int) (bytesExtracted * 100L / totalBytes));
                         }
                     });
-            asset.close();
         } catch (IOException e) {
             Log.e(TAG, "falha na extração do runtime", e);
             result = RuntimeInstaller.InstallResult.EXTRACTED;
@@ -80,12 +83,21 @@ public class MainActivity extends Activity {
         File wrapper = new File(getFilesDir(), "opencode/opencode2");
         boolean wrapperPresent = wrapper.isFile();
 
-        // O plano é decidido pelo ABI *primário*: emuladores x86_64 podem
-        // anunciar arm64-v8a secundário (tradução), mas o runtime nativo
-        // só roda no ABI primário. Usar apenas Build.SUPPORTED_ABIS[0].
+        // Política de ABI (primary only): o runtime pinado é arm64-v8a only
+        // (ver vendor/libtermexec/VENDORED.md — ABI arm64-v8a/x86_64 do NDK,
+        // proc nativo arm64). Uma propaganda de arm64-v8a como ABI *secundária*
+        // (android.os.Build.SUPPORTED_ABIS contém arm64-v8a em emuladores x86,
+        // via camada de tradução) NÃO implica que o processo rode nativo em
+        // arm64 — tentar spawnar o binário arm64 em hardware x86_64 secundário
+        // falha com status != 0 (observado na Task 10). Por isso o plano usa
+        // apenas o ABI primário (SUPPORTED_ABIS[0]): planFor recebe
+        // arm64-v8a ∈ {abis} apenas quando o ABI primário é efetivamente
+        // arm64-v8a.
         String primaryAbi = (android.os.Build.SUPPORTED_ABIS != null
                 && android.os.Build.SUPPORTED_ABIS.length > 0)
                 ? android.os.Build.SUPPORTED_ABIS[0] : null;
+        // Envolvemos o ABI primário como array de 1 elemento: TermBridge.planFor
+        // preserva a API (arm64-v8a ∈ abis); aqui "abis" = [primaryAbi].
         TermBridge.Plan plan = TermBridge.planFor(
                 primaryAbi == null ? new String[0] : new String[] {primaryAbi},
                 wrapperPresent);
@@ -126,14 +138,15 @@ public class MainActivity extends Activity {
         mContainer.addView(extraKeys, lp);
     }
 
-    private static final class AssetHandle {
+    private static final class AssetHandle implements AutoCloseable {
         final InputStream stream;
         final long length;
         AssetHandle(InputStream stream, long length) {
             this.stream = stream;
             this.length = length;
         }
-        void close() throws IOException {
+        @Override
+        public void close() throws IOException {
             stream.close();
         }
     }
