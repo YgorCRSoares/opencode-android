@@ -1,66 +1,73 @@
 package dev.opencode.terminal;
 
 import android.app.Activity;
+import android.content.Intent;
 import android.os.Bundle;
 import android.widget.FrameLayout;
 import android.view.Gravity;
 
-/**
- * Task 6: shell interativo no AVD (spec T1).
- *
- * <p>Wiring mínimo — toda a lógica de PTY/sessão vive em {@link TermController}.
- * Path de teste: spawn de {@code /system/bin/sh} com o env fixado por
- * {@link EnvBuilder#build}. A integração com a runtime OpenCode (outro argv,
- * chaves de provider) é da Task 10.
- */
 public class MainActivity extends Activity {
 
+    private static final int REQ_SETUP = 1;
+
+    private FrameLayout mContainer;
     private TermController mTerm;
+    private SettingsStore.PrefsSettingsStore mStore;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
 
-        // FrameLayout: o overlay "Sessão encerrada" fica por cima da view.
-        FrameLayout container = new FrameLayout(this);
-        setContentView(container);
+        mStore = new SettingsStore.PrefsSettingsStore(this);
+        mContainer = new FrameLayout(this);
+        setContentView(mContainer);
 
-        mTerm = new TermController(this, container);
+        if (!mStore.setupDone()) {
+            startActivityForResult(new Intent(this, SetupActivity.class), REQ_SETUP);
+            return;
+        }
+        startTerminal();
+    }
+
+    private void startTerminal() {
+        if (mTerm != null) return;
+        mTerm = new TermController(this, mContainer);
         mTerm.start(
                 new String[] { "/system/bin/sh" },
-                EnvBuilder.build(getFilesDir(), null, null),
-                null /* cwd: ignorado pelo TermExec (sem chdir) */);
+                EnvBuilder.build(getFilesDir(), mStore.provider(), mStore.apiKey()),
+                null /* cwd */);
 
-        // Linha de teclas especiais acima do teclado.
         ExtraKeysView extraKeys = new ExtraKeysView(this, mTerm);
         FrameLayout.LayoutParams lp = new FrameLayout.LayoutParams(
                 FrameLayout.LayoutParams.MATCH_PARENT,
                 FrameLayout.LayoutParams.WRAP_CONTENT,
                 Gravity.BOTTOM);
-        container.addView(extraKeys, lp);
+        mContainer.addView(extraKeys, lp);
+    }
+
+    @Override
+    protected void onActivityResult(int requestCode, int resultCode, Intent data) {
+        super.onActivityResult(requestCode, resultCode, data);
+        if (requestCode == REQ_SETUP) {
+            startTerminal();
+        }
     }
 
     @Override
     protected void onResume() {
         super.onResume();
-        if (mTerm != null) {
-            mTerm.onResume();
-        }
+        if (mTerm != null) mTerm.onResume();
     }
 
     @Override
     protected void onPause() {
-        if (mTerm != null) {
-            mTerm.onPause();
-        }
+        if (mTerm != null) mTerm.onPause();
         super.onPause();
     }
 
     @Override
     protected void onDestroy() {
-        if (mTerm != null) {
-            mTerm.onDestroy();
-        }
+        if (mTerm != null) mTerm.onDestroy();
         super.onDestroy();
     }
 }
