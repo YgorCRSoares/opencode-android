@@ -60,8 +60,8 @@ download_pinned() {
 
 assert_aarch64_elf() {
     local file_path="$1"
-    if ! LC_ALL=C file "$file_path" | grep -q 'ELF'; then
-        log "not an ELF file: $file_path" >&2
+    if ! LC_ALL=C readelf -h "$file_path" >/dev/null 2>&1; then
+        log "not an ELF file (readelf failed): $file_path" >&2
         exit 1
     fi
     local machine
@@ -74,9 +74,9 @@ assert_aarch64_elf() {
 
 # ----- Ferramentas obrigatórias -----
 command -v bsdtar >/dev/null 2>&1 || { log "bsdtar is required"; exit 1; }
-command -v unzip >/dev/null 2>&1 || { log "unzip is required"; exit 1; }
 command -v curl >/dev/null 2>&1 || { log "curl is required"; exit 1; }
 command -v sha256sum >/dev/null 2>&1 || { log "sha256sum is required"; exit 1; }
+command -v readelf >/dev/null 2>&1 || { log "readelf is required"; exit 1; }
 
 mkdir -p "$CACHE_DIR"
 download_pinned "$RUNTIME_URL" "$RUNTIME_SHA256" "$RUNTIME_CACHE"
@@ -85,7 +85,7 @@ download_pinned "$RIPGREP_URL" "$RIPGREP_SHA256" "$RIPGREP_CACHE"
 # ----- Extrai runtime (3 arquivos flat) -----
 RUNTIME_DIR="$STAGING_DIR/runtime"
 mkdir -p "$RUNTIME_DIR"
-unzip -q "$RUNTIME_CACHE" -d "$RUNTIME_DIR"
+bsdtar -xf "$RUNTIME_CACHE" -C "$RUNTIME_DIR"
 for runtime_file in opencode2 opencode2.bin libopentui.so; do
     if [[ ! -f "$RUNTIME_DIR/$runtime_file" ]]; then
         log "missing runtime file: $runtime_file" >&2
@@ -166,11 +166,11 @@ create_zip "$PKG_DIR" "$OUTPUT_ZIP"
 log "wrote $OUTPUT_ZIP"
 
 # ----- Asserts internos -----
-mapfile -t entry_list < <(unzip -Z1 "$OUTPUT_ZIP")
+mapfile -t entry_list < <(bsdtar -tf "$OUTPUT_ZIP" | sed '/^$/d')
 
 if [[ ${#entry_list[@]} -ne 4 ]]; then
     log "expected 4 entries, got ${#entry_list[@]}" >&2
-    unzip -l "$OUTPUT_ZIP" >&2
+    bsdtar -tf "$OUTPUT_ZIP" >&2
     exit 1
 fi
 for entry in "${entry_list[@]}"; do
@@ -190,14 +190,14 @@ expected_sorted="$(printf '%s\n' "${expected_entries[@]}" | sort)"
 actual_sorted="$(printf '%s\n' "${entry_list[@]}" | sort)"
 if [[ "$expected_sorted" != "$actual_sorted" ]]; then
     log "unexpected entry set" >&2
-    unzip -l "$OUTPUT_ZIP" >&2
+    bsdtar -tf "$OUTPUT_ZIP" >&2
     exit 1
 fi
 
 # Re-extração limpa do bin/rg + checagem ELF.
 REEXTRACT_DIR="$STAGING_DIR/reextracted"
 mkdir -p "$REEXTRACT_DIR"
-unzip -q "$OUTPUT_ZIP" 'bin/rg' -d "$REEXTRACT_DIR"
+bsdtar -xf "$OUTPUT_ZIP" -C "$REEXTRACT_DIR" bin/rg
 assert_aarch64_elf "$REEXTRACT_DIR/bin/rg"
 if LC_ALL=C readelf -d "$REEXTRACT_DIR/bin/rg" | grep -q 'libc\.so\.6'; then
     log "re-extracted rg links glibc (libc.so.6)" >&2
@@ -205,5 +205,5 @@ if LC_ALL=C readelf -d "$REEXTRACT_DIR/bin/rg" | grep -q 'libc\.so\.6'; then
 fi
 
 log "OK: 4 entries, aarch64, bionic-only rg"
-log "unzip -l:"
-unzip -l "$OUTPUT_ZIP" >&2
+log "bsdtar -tf:"
+bsdtar -tf "$OUTPUT_ZIP" >&2
