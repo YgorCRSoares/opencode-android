@@ -1,18 +1,18 @@
-package dev.opencode.verify;
+package dev.opencode.terminal;
 
 import android.app.Activity;
+import android.os.Build;
 import android.os.Bundle;
 import android.widget.TextView;
 
-/** App mínimo para validar o toolchain Android (SDK + Gradle + AGP + JDK 21). */
+/** Placeholder da UI inicial — reescrito na Task 6. */
 public class MainActivity extends Activity {
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         TextView tv = new TextView(this);
-        tv.setText("Toolchain OK — opencode-android\nBuild validado\nAPI "
-                + android.os.Build.VERSION.SDK_INT + " ("
-                + android.os.Build.VERSION.RELEASE + ")");
+        tv.setText("OpenCode Terminal\nABIs suportadas:\n"
+                + String.join("\n", Build.SUPPORTED_ABIS));
         tv.setTextColor(0xFF212121);
         // 400px de topo: a ActionBar cobre y=0..283 (content em overlay)
         tv.setPadding(64, 400, 64, 64);
