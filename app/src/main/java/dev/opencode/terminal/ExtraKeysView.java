@@ -28,7 +28,7 @@ public class ExtraKeysView extends LinearLayout {
     private Button mCtrlButton;
 
     private static final String[] KEY_LABELS = new String[] {
-            "ESC", "Ctrl", "Tab", "\u2190", "\u2191", "\u2193", "\u2192", "/"
+            "Esc", "Ctrl", "Tab", "\u2190", "\u2191", "\u2193", "\u2192", "/"
     };
     private static final String[] KEY_CODES = new String[] {
             "ESC", "CTRL", "TAB", "LEFT", "UP", "DOWN", "RIGHT", "/"
@@ -46,6 +46,7 @@ public class ExtraKeysView extends LinearLayout {
             Button btn = new Button(context);
             btn.setText(KEY_LABELS[i]);
             btn.setFocusable(false);
+            btn.setAllCaps(false);
             btn.setMinWidth(0);
             btn.setMinHeight(0);
             btn.setOnClickListener(new View.OnClickListener() {

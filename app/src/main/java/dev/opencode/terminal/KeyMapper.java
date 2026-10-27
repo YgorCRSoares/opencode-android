@@ -29,9 +29,7 @@ public final class KeyMapper {
             return new byte[] { 0x1b, '[', 'B' };
         }
         if ("/".equals(key)) {
-            if (ctrlOn) {
-                return new byte[] { (byte) ('/' & 0x1f) };
-            }
+            // Ctrl aplica-se apenas a letras (spec); "/" emite '/' sempre.
             return new byte[] { '/' };
         }
 

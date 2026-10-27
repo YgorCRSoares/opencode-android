@@ -29,4 +29,9 @@ public class KeyMapperTest {
     public void tabIs0x09() {
         assertArrayEquals(new byte[] { 0x09 }, KeyMapper.bytesFor("TAB", false));
     }
+
+    @Test
+    public void slashStaysSlashEvenWithCtrlArmed() {
+        assertArrayEquals(new byte[] { '/' }, KeyMapper.bytesFor("/", true));
+    }
 }
