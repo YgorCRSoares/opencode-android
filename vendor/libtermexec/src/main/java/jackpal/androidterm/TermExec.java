@@ -99,6 +99,17 @@ public class TermExec {
     public static native int waitFor(int processId);
 
     /**
+     * Adjust the window size of the pty associated with {@code fd} via
+     * {@code TIOCSWINSZ}. Without this the pty reports 0x0 to programs such as
+     * full-screen TUIs until they are given an explicit size.
+     *
+     * @param fd      pty master file descriptor
+     * @param rows    terminal rows
+     * @param columns terminal columns
+     */
+    public static native void setPtyWindowSize(int fd, int rows, int columns);
+
+    /**
      * Send signal via the "kill" system call. Android {@link android.os.Process#sendSignal} does not
      * allow negative numbers (denoting process groups) to be used.
      */

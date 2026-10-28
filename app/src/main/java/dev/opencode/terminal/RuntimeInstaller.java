@@ -38,7 +38,9 @@ public final class RuntimeInstaller {
     /** Resultado de {@link #install}. */
     public enum InstallResult {
         EXTRACTED,
-        UPTODATE
+        UPTODATE,
+        /** O chamador não conseguiu instalar; deve usar o shell de fallback. */
+        FAILED
     }
 
     private RuntimeInstaller() {
@@ -58,12 +60,34 @@ public final class RuntimeInstaller {
             String version, ProgressListener listener) throws IOException {
         File marker = new File(baseDir, MARKER_NAME);
         if (marker.isFile() && version.equals(readMarker(marker))) {
+            ensureExecutables(baseDir);
             return InstallResult.UPTODATE;
         }
 
         extractAll(baseDir, zip, totalBytes, listener);
+        ensureExecutables(baseDir);
         writeMarker(marker, version);
         return InstallResult.EXTRACTED;
+    }
+
+    /**
+     * Binários que o wrapper (teste {@code -x}) e o PATH do app precisam executar.
+     * O {@link ZipInputStream} não aplica modos Unix; o {@link FileOutputStream}
+     * cria os arquivos como 0600, então o chmod é obrigatório.
+     */
+    private static final String[] EXECUTABLE_PATHS = {
+            "opencode/opencode2",
+            "opencode/opencode2.bin",
+            "bin/rg"
+    };
+
+    private static void ensureExecutables(File baseDir) throws IOException {
+        for (String relative : EXECUTABLE_PATHS) {
+            File file = new File(baseDir, relative);
+            if (file.isFile() && !file.canExecute() && !file.setExecutable(true, false)) {
+                throw new IOException("não foi possível tornar executável " + file);
+            }
+        }
     }
 
     private static void extractAll(File baseDir, InputStream zip, long totalBytes,

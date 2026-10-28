@@ -139,18 +139,30 @@ MainActivity.onCreate
  │     └─ SÍ → tela de progresso → extrair assets/runtime-arm64.zip
  │              para files/ (barra de progresso real: bytes/descomprimidos)
  │              → escrever marker → prosseguir
- ├─ 2. Arquitetura incompatível? (Build.SUPPORTED_ABIS não contém arm64)
+ ├─ 2. ABI primária != arm64? (Build.SUPPORTED_ABIS[0] != "arm64-v8a")
  │     └─ SÍ → fallback: spawn de /system/bin/sh no PTY + banner explicando
- │              que a runtime é arm64 (usado no AVD x86_64 de teste)
+ │              que a runtime exige arm64 primário (AVD x86_64 de teste)
  ├─ 3. Montar env: HOME, PREFIX=$FILES/prefix, PATH=$FILES/bin:/system/bin,
  │     SHELL=/system/bin/sh (mksh — o bash tool do OpenCode usa $SHELL),
  │     TERM=xterm-256color, LANG, TMPDIR, XDG_*,
  │     OPENCODE_DISABLE_AUTOUPDATE=1 (sem update-check offline, M2),
  │     chaves de provider (§5.5)
- ├─ 4. PTY via libtermexec → spawn: `sh $FILES/opencode/opencode2` (§5.2)
+ ├─ 4. PTY via libtermexec → winsize inicial 80x24 (TIOCSWINSZ) e atualização
+ │     no updateSize; spawn: `/system/bin/sh $FILES/opencode/opencode2` (§5.2)
  │     └─ falha de exec → fallback sh + painel de erro legível (anti-meta)
  └─ 5. TermSession + EmulatorView na tela; extra-keys row acima do teclado
 ```
+
+> **ABI primária:** o arm64 só conta como runtime quando é
+> `Build.SUPPORTED_ABIS[0]`. No AVD x86_64, `arm64-v8a` é secundária via
+> `libndk_translation`: o shell executa o wrapper, mas o `execve` feito pelo
+> processo do app (`untrusted_app`) retorna `EACCES` mesmo com o binário 755,
+> SELinux concedendo `execute` e `/data` sem `noexec`. Isso é limitação da
+> bridge no AVD, não do S26+ arm64 nativo; a TUI é validada no aparelho.
+>
+> **`execv` e PATH:** o `TermExec` usa `execv(3)`, que não pesquisa `PATH`.
+> Passar `{"sh", wrapper}` faz o filho sair 255 sem escrever nada; o argv do
+> runtime precisa ser `{"/system/bin/sh", wrapper}`.
 
 - **Extração:** um único asset `runtime-arm64.zip` (o release já é zip; reempacotamos
   no formato do nosso layout durante o build no PC). ~10–30 s no armazenamento do
@@ -166,6 +178,8 @@ MainActivity.onCreate
   não têm Esc/setas e a TUI do OpenCode depende delas — sem isso, M3 falha na prática.
   (Decisão minha; layout final é ajuste de builder.)
 - Retenção de orientação livre (a view redimensiona; a TUI re-renderiza).
+- PTY com `winsize` real: 80x24 inicial e `TIOCSWINSZ` em `updateSize`; sem
+  isso o TUI lê 0x0 e pode falhar antes do primeiro layout.
 - Fonte monoespaçada padrão, tamanho ajustável depois (não-meta: pinch-zoom).
 
 ### 5.5 Chave do provider (API key)

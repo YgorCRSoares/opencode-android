@@ -180,6 +180,16 @@ static int create_subprocess(JNIEnv *env, const char *cmd, char *const argv[], c
 
 extern "C" {
 
+JNIEXPORT void JNICALL Java_jackpal_androidterm_TermExec_setPtyWindowSize(JNIEnv *env, jclass clazz,
+    jint fd, jint rows, jint columns)
+{
+    struct winsize size;
+    memset(&size, 0, sizeof(size));
+    size.ws_row = (unsigned short) rows;
+    size.ws_col = (unsigned short) columns;
+    ioctl(fd, TIOCSWINSZ, &size);
+}
+
 JNIEXPORT void JNICALL Java_jackpal_androidterm_TermExec_sendSignal(JNIEnv *env, jobject clazz,
     jint procId, jint signal)
 {

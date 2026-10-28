@@ -21,6 +21,15 @@ public class TermBridgeTest {
     }
 
     @Test
+    public void x86WithArm64SecondaryIsFallback() {
+        // arm64 via libndk_translation não é ABI primária: o exec do app
+        // retorna EACCES no AVD, então o shell de diagnóstico é o caminho seguro.
+        TermBridge.Plan plan = TermBridge.planFor(new String[] {"x86_64", "arm64-v8a"}, true);
+        assertEquals(TermBridge.Mode.FALLBACK, plan.mode);
+        assertEquals("arm64_only", plan.reason);
+    }
+
+    @Test
     public void x86OnlyIsFallbackArm64Only() {
         TermBridge.Plan plan = TermBridge.planFor(new String[] {"x86_64"}, false);
         assertEquals(TermBridge.Mode.FALLBACK, plan.mode);

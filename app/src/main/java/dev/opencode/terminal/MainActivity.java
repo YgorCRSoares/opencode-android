@@ -85,34 +85,29 @@ public class MainActivity extends Activity {
                     });
         } catch (IOException e) {
             Log.e(TAG, "falha na extração do runtime", e);
-            result = RuntimeInstaller.InstallResult.EXTRACTED;
+            result = RuntimeInstaller.InstallResult.FAILED;
         } finally {
             progress.dismiss();
         }
 
         Log.i(TAG, "install result=" + result);
 
-        File wrapper = new File(getFilesDir(), "opencode/opencode2");
-        boolean wrapperPresent = wrapper.isFile();
+        File runtimeDir = new File(getFilesDir(), "opencode");
+        File wrapper = new File(runtimeDir, "opencode2");
+        File runtimeBin = new File(runtimeDir, "opencode2.bin");
+        boolean wrapperPresent = wrapper.isFile() && runtimeBin.isFile();
 
-        // Política de ABI (primary only): o runtime pinado é arm64-v8a only
-        // (ver vendor/libtermexec/VENDORED.md — ABI arm64-v8a/x86_64 do NDK,
-        // proc nativo arm64). Uma propaganda de arm64-v8a como ABI *secundária*
-        // (android.os.Build.SUPPORTED_ABIS contém arm64-v8a em emuladores x86,
-        // via camada de tradução) NÃO implica que o processo rode nativo em
-        // arm64 — tentar spawnar o binário arm64 em hardware x86_64 secundário
-        // falha com status != 0 (observado na Task 10). Por isso o plano usa
-        // apenas o ABI primário (SUPPORTED_ABIS[0]): planFor recebe
-        // arm64-v8a ∈ {abis} apenas quando o ABI primário é efetivamente
-        // arm64-v8a.
-        String primaryAbi = (android.os.Build.SUPPORTED_ABIS != null
-                && android.os.Build.SUPPORTED_ABIS.length > 0)
-                ? android.os.Build.SUPPORTED_ABIS[0] : null;
-        // Envolvemos o ABI primário como array de 1 elemento: TermBridge.planFor
-        // preserva a API (arm64-v8a ∈ abis); aqui "abis" = [primaryAbi].
-        TermBridge.Plan plan = TermBridge.planFor(
-                primaryAbi == null ? new String[0] : new String[] {primaryAbi},
-                wrapperPresent);
+        // O runtime pinado é arm64-v8a. Só o usamos quando arm64 é a ABI
+        // primária. No AVD x86_64, arm64-v8a aparece como ABI secundária via
+        // libndk_translation: o shell executa o binário, mas o execve a partir
+        // do processo do app é negado com EACCES. Nesse caso, shell de
+        // diagnóstico; no telefone arm64 nativo o runtime é usado.
+        String[] supportedAbis = android.os.Build.SUPPORTED_ABIS != null
+                ? android.os.Build.SUPPORTED_ABIS : new String[0];
+        TermBridge.Plan plan = TermBridge.planFor(supportedAbis, wrapperPresent);
+        if (result == RuntimeInstaller.InstallResult.FAILED) {
+            plan = new TermBridge.Plan(TermBridge.Mode.FALLBACK, "install_failed");
+        }
         Log.i(TAG, "plan=" + plan.mode + " reason=" + plan.reason);
 
         if (mTerm != null) return;
@@ -120,7 +115,10 @@ public class MainActivity extends Activity {
 
         String[] argv;
         if (plan.mode == TermBridge.Mode.RUNTIME) {
-            argv = new String[] {"sh", new File(getFilesDir(), "opencode/opencode2").getAbsolutePath()};
+            // TermExec usa execv(3), que NÃO pesquisa o PATH. Com "sh" o
+            // execv falha com ENOENT e o filho sai 255 sem escrever nada.
+            // Use o mesmo caminho absoluto do fallback.
+            argv = new String[] {"/system/bin/sh", wrapper.getAbsolutePath()};
         } else {
             argv = new String[] {"/system/bin/sh"};
         }
@@ -129,7 +127,7 @@ public class MainActivity extends Activity {
 
         if (plan.mode == TermBridge.Mode.FALLBACK) {
             TextView banner = new TextView(this);
-            banner.setText("Fallback: " + plan.reason);
+            banner.setText(fallbackMessage(plan.reason));
             banner.setTextColor(0xFFFFFFFF);
             banner.setBackgroundColor(0xFF37474F);
             banner.setTextSize(14f);
@@ -147,6 +145,18 @@ public class MainActivity extends Activity {
                 LinearLayout.LayoutParams.MATCH_PARENT,
                 LinearLayout.LayoutParams.WRAP_CONTENT);
         mRoot.addView(extraKeys, lp);
+    }
+
+    private static String fallbackMessage(String reason) {
+        switch (reason) {
+            case "install_failed":
+                return "OpenCode indisponível: falha ao instalar o runtime. Shell de diagnóstico.";
+            case "missing_runtime":
+                return "OpenCode indisponível: runtime não encontrado. Shell de diagnóstico.";
+            case "arm64_only":
+            default:
+                return "OpenCode indisponível: o runtime exige arm64 como ABI primário. Shell de diagnóstico.";
+        }
     }
 
     private static final class AssetHandle implements AutoCloseable {

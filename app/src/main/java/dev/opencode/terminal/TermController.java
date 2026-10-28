@@ -15,8 +15,8 @@ import android.widget.TextView;
 
 import java.io.File;
 import java.io.IOException;
-import java.util.Map;
 import java.io.OutputStream;
+import java.util.Map;
 
 import jackpal.androidterm.TermExec;
 import jackpal.androidterm.emulatorview.EmulatorView;
@@ -87,7 +87,21 @@ public final class TermController {
         }
 
         mOutput = new ParcelFileDescriptor.AutoCloseOutputStream(mPtmx);
-        TermSession session = new TermSession(false);
+
+        // O PTY recém-aberto tem winsize 0x0. O TUI consulta TIOCGWINSZ e
+        // pode falhar antes do primeiro layout do EmulatorView; fixa 80x24
+        // e atualiza com o tamanho real em updateSize().
+        TermExec.setPtyWindowSize(mPtmx.getFd(), 24, 80);
+
+        TermSession session = new TermSession(false) {
+            @Override
+            public void updateSize(int columns, int rows) {
+                super.updateSize(columns, rows);
+                if (mPtmx != null) {
+                    TermExec.setPtyWindowSize(mPtmx.getFd(), rows, columns);
+                }
+            }
+        };
         session.setTermIn(new ParcelFileDescriptor.AutoCloseInputStream(mPtmx));
         session.setTermOut(mOutput);
         mSession = session;

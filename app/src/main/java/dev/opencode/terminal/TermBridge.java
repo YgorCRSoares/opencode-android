@@ -28,8 +28,14 @@ public final class TermBridge {
     }
 
     /**
-     * Decisão pura: {@code arm64-v8a} precisa estar entre as ABIs suportadas
-     * <strong>e</strong> o wrapper de runtime precisa estar presente.
+     * Decisão pura: o runtime arm64 só é usado quando {@code arm64-v8a} é a
+     * <strong>ABI primária</strong> (primeiro item de {@code Build.SUPPORTED_ABIS})
+     * <strong>e</strong> o wrapper está presente.
+     *
+     * <p>No AVD x86_64, {@code arm64-v8a} aparece como ABI secundária através do
+     * {@code libndk_translation}. O shell consegue executar o binário, mas o
+     * {@code execve} feito pelo processo do app (uid {@code untrusted_app}) é
+     * negado com {@code EACCES}; por isso não tratamos ABI secundária como runtime.
      *
      * @param supportedAbis   ABIs reportadas pelo sistema (ex.: {@code Build.SUPPORTED_ABIS})
      * @param wrapperPresent  {@code true} se o binário {@code opencode/opencode2} (ou wrapper)
@@ -37,15 +43,9 @@ public final class TermBridge {
      * @return plano com modo e motivo
      */
     public static Plan planFor(String[] supportedAbis, boolean wrapperPresent) {
-        boolean arm64 = false;
-        if (supportedAbis != null) {
-            for (String abi : supportedAbis) {
-                if ("arm64-v8a".equals(abi)) {
-                    arm64 = true;
-                    break;
-                }
-            }
-        }
+        boolean arm64 = supportedAbis != null
+                && supportedAbis.length > 0
+                && "arm64-v8a".equals(supportedAbis[0]);
         if (arm64 && wrapperPresent) {
             return new Plan(Mode.RUNTIME, "ok");
         }
