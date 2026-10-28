@@ -12,6 +12,7 @@ public class SetupActivity extends Activity {
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_setup);
+        ContentInsets.apply(this);
 
         Spinner spinner = (Spinner) findViewById(R.id.provider_spinner);
         ArrayAdapter<String> adapter = new ArrayAdapter<String>(

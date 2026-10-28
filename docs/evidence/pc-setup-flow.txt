@@ -1,0 +1,30 @@
+Validação do Setup no AVD (2026-10-28, 1080x2400, API 36)
+
+Layout após o fix de insets:
+  "Proveedores" [63,346][271,397]
+  spinner       [63,400][891,457]
+  API key       [63,460][1017,578]
+  SALVAR        [63,578][540,704]
+  PULAR         [540,578][1017,704]
+
+SALVAR (spinner=openai; chave fictícia dummy-key-123):
+  topResumedActivity=dev.opencode.terminal/.MainActivity
+  shared_prefs/oc_settings.xml:
+    provider=openai
+    key=dummy-key-123   (fictícia; nenhuma chave real)
+    skipped=false
+  logcat: install result=UPTODATE; plan=FALLBACK reason=arm64_only
+
+PULAR:
+  topResumedActivity=dev.opencode.terminal/.MainActivity
+  shared_prefs/oc_settings.xml:
+    skipped=true
+
+BACK (Setup sem salvar/pular):
+  antes:  topResumedActivity=dev.opencode.terminal/.SetupActivity
+  depois: topResumedActivity=com.google.android.apps.nexuslauncher/.NexusLauncherActivity
+  ocorrências de MainActivity no dump de activities: 0
+  shared_prefs/oc_settings.xml: ausente
+
+Conclusão: SALVAR e PULAR iniciam o terminal; BACK fecha o app sem burlar o
+gate do setup.

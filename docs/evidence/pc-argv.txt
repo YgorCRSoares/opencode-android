@@ -1,0 +1,11 @@
+Validação no AVD — build final (2026-10-28)
+
+app PID 6619; shell filho do PTY PID 6669.
+
+/proc/6669/cmdline (od -An -c):
+   /   s   y   s   t   e   m   /   b   i   n   /   s   h  \0
+
+Ocorrências de "null argv" no logcat: 0.
+
+Confirma o fix do TermExec: argv[0] = executável; comandos com um elemento
+não viram execv(cmd, NULL), e comandos com argumentos não perdem o argv[0].

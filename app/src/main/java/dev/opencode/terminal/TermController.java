@@ -1,6 +1,7 @@
 package dev.opencode.terminal;
 
 import android.app.Activity;
+import android.content.Context;
 import android.os.Handler;
 import android.os.Looper;
 import android.os.ParcelFileDescriptor;
@@ -8,6 +9,7 @@ import android.util.DisplayMetrics;
 import android.view.Gravity;
 import android.view.View;
 import android.view.ViewGroup;
+import android.view.inputmethod.InputMethodManager;
 import android.widget.FrameLayout;
 import android.widget.TextView;
 
@@ -93,6 +95,10 @@ public final class TermController {
         DisplayMetrics metrics = new DisplayMetrics();
         mActivity.getWindowManager().getDefaultDisplay().getMetrics(metrics);
         mView = new EmulatorView(mActivity, session, metrics);
+        // IME "cooked": o Gboard entrega texto via commitText, caminho em que
+        // o Ctrl one-shot é aplicado. Com TYPE_NULL ele manda key events e o
+        // toggle não vale (allowToggle=false para o teclado virtual).
+        mView.setUseCookedIME(true);
         mContainer.addView(mView, new ViewGroup.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
         mContainer.bringChildToFront(mOverlay);
@@ -143,6 +149,22 @@ public final class TermController {
     public void sendCtrl() {
         if (mView != null) {
             mView.sendControlKey();
+        }
+    }
+
+    /**
+     * Abre o teclado virtual para o EmulatorView. Sem isso o usuário de celular
+     * (sem teclado físico) não consegue digitar comandos nem usar o TUI.
+     */
+    public void showSoftKeyboard() {
+        if (mView == null) {
+            return;
+        }
+        mView.requestFocus();
+        InputMethodManager imm = (InputMethodManager)
+                mActivity.getSystemService(Context.INPUT_METHOD_SERVICE);
+        if (imm != null) {
+            imm.showSoftInput(mView, InputMethodManager.SHOW_IMPLICIT);
         }
     }
 

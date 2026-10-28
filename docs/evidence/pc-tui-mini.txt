@@ -1,0 +1,3 @@
+▪ oc mini v2.0.0-android-termux.2 · /tmp/opencode/simapp
+┃ Ask anything, / for commands, @ for context…
+Build · GPT-4o mini · OpenAI · ctrl+p menu

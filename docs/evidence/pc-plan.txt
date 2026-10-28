@@ -1,0 +1,8 @@
+Validação no AVD — build final (2026-10-28, app PID 6619)
+
+I MainActivity: install result=UPTODATE
+I MainActivity: plan=FALLBACK reason=arm64_only
+
+O AVD é x86_64; o ABI primário é x86_64, então o plano é FALLBACK arm64_only.
+O runtime arm64 foi validado separadamente no PC via qemu-user-static:
+pc-tui-mini.txt, pc-runtime-version.txt, pc-llm-turn.txt, pc-rg.txt.

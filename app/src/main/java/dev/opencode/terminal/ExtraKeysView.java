@@ -13,9 +13,9 @@ import java.io.IOException;
 import java.io.OutputStream;
 
 /**
- * Fixed row of extra keys (Esc, Ctrl, Tab, arrows, /) rendered above the
- * soft keyboard. Writes the mapped raw bytes to the PTY master obtained from
- * {@link TermController#outputStream()}.
+ * Fixed row of extra keys (Esc, Ctrl, Tab, arrows, /, KB) rendered below the
+ * terminal and above the soft keyboard. Writes the mapped raw bytes to the PTY
+ * master obtained from {@link TermController#outputStream()}.
  *
  * <p>Ctrl is one-shot: pressing it arms the modifier; the next dispatched key
  * consumes it and disarms.</p>
@@ -28,10 +28,10 @@ public class ExtraKeysView extends LinearLayout {
     private Button mCtrlButton;
 
     private static final String[] KEY_LABELS = new String[] {
-            "Esc", "Ctrl", "Tab", "\u2190", "\u2191", "\u2193", "\u2192", "/"
+            "Esc", "Ctrl", "Tab", "\u2190", "\u2191", "\u2193", "\u2192", "/", "KB"
     };
     private static final String[] KEY_CODES = new String[] {
-            "ESC", "CTRL", "TAB", "LEFT", "UP", "DOWN", "RIGHT", "/"
+            "ESC", "CTRL", "TAB", "LEFT", "UP", "DOWN", "RIGHT", "/", "KB"
     };
 
     public ExtraKeysView(Context context, TermController controller) {
@@ -49,6 +49,9 @@ public class ExtraKeysView extends LinearLayout {
             btn.setAllCaps(false);
             btn.setMinWidth(0);
             btn.setMinHeight(0);
+            btn.setSingleLine(true);
+            btn.setTextSize(12f);
+            btn.setPadding(0, 0, 0, 0);
             btn.setOnClickListener(new View.OnClickListener() {
                 @Override
                 public void onClick(View v) {
@@ -64,6 +67,12 @@ public class ExtraKeysView extends LinearLayout {
     }
 
     private void handleKey(String code) {
+        if ("KB".equals(code)) {
+            if (mController != null) {
+                mController.showSoftKeyboard();
+            }
+            return;
+        }
         if ("CTRL".equals(code)) {
             mCtrlArmed = true;
             updateCtrlColor();

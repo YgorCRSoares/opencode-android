@@ -1,0 +1,33 @@
+Validação do terminal no AVD — build final (2026-10-28, fallback shell)
+
+KB:
+  InputMethodManager mInputShown=true; Gboard visível; linha ExtraKeys acima
+  do teclado e abaixo do terminal.
+
+Ctrl+C:
+  Digitar "sleep 100" + Enter; tocar Ctrl; tocar "c" no Gboard.
+  Resultado: "^C" e prompt "130|:/ $".
+
+  O Gboard em TYPE_NULL entrega letras como key events e o toggle one-shot do
+  Ctrl era ignorado. Fix: modo cooked com
+  TYPE_CLASS_TEXT | TYPE_TEXT_VARIATION_VISIBLE_PASSWORD |
+  TYPE_TEXT_FLAG_NO_SUGGESTIONS; o commitText passa por mapControlChar e o
+  Ctrl é aplicado, sem autocorreção/sugestões.
+
+Setas:
+  "echo ABC"; Left duas vezes; "X"; Enter.
+  Linha: "echo AXBC"; saída: "AXBC".
+
+Echo:
+  "echo hello" -> "hello".
+
+Linha ExtraKeys:
+  Esc, Ctrl, Tab, ←, ↑, ↓, →, /, KB (9 botões; 12sp; sem quebra de linha).
+  A linha fica abaixo do EmulatorView (não cobre a última linha do TUI);
+  com o IME aberto, adjustResize mantém a linha acima do teclado.
+
+Capturas:
+  pc-fallback-layout.png  terminal acima da linha ExtraKeys, sem IME
+  pc-fallback-echo.png    echo hello
+  pc-fallback-ctrlc.png   Ctrl+C via Gboard (^C, prompt 130)
+  pc-fallback-arrows.png  setas + X -> AXBC

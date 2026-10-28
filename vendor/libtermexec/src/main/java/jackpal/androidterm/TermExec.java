@@ -73,7 +73,14 @@ public class TermExec {
             throw new IllegalStateException("Empty command!");
 
         final String cmd = command.remove(0);
-        final String[] cmdArray = command.toArray(new String[command.size()]);
+        // O nativo monta argv apenas com cmdArray; sem o executável na posição
+        // 0, um comando de 1 elemento virava execv(cmd, NULL) e comandos com
+        // argumentos perdiam o argv[0] (o shell via argc=0 / args deslocados).
+        final String[] cmdArray = new String[command.size() + 1];
+        cmdArray[0] = cmd;
+        for (int i = 0; i < command.size(); i++) {
+            cmdArray[i + 1] = command.get(i);
+        }
         final String[] envArray = new String[environment.size()];
         int i = 0;
         for (Map.Entry<String, String> entry : environment.entrySet()) {

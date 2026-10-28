@@ -7,8 +7,9 @@ import android.content.res.AssetFileDescriptor;
 import android.content.res.AssetManager;
 import android.os.Bundle;
 import android.util.Log;
-import android.view.Gravity;
+import android.view.ViewGroup;
 import android.widget.FrameLayout;
+import android.widget.LinearLayout;
 import android.widget.TextView;
 
 import java.io.File;
@@ -27,9 +28,13 @@ public class MainActivity extends Activity {
      * Versão gravada em {@code .extracted_marker} pelo {@link RuntimeInstaller}.
      * Ancorada ao {@code versionName} do build; mantida aqui como literal
      * enquanto {@code buildConfig} não é gerado pelo AGP (ver build.gradle.kts).
+     *
+     * <p>1.1: asset passou a incluir {@code bin/libpcre2-8.so} (dependência do
+     * rg) — bump força re-extração em instalações que tinham o asset 1.0.
      */
-    private static final String RUNTIME_MARKER_VERSION = "1.0";
+    private static final String RUNTIME_MARKER_VERSION = "1.1";
 
+    private LinearLayout mRoot;
     private FrameLayout mContainer;
     private TermController mTerm;
     private SettingsStore mStore;
@@ -39,8 +44,15 @@ public class MainActivity extends Activity {
         super.onCreate(savedInstanceState);
 
         mStore = new PrefsSettingsStore(this);
+        // Banner de fallback fica em uma linha própria (acima do terminal),
+        // não sobre a primeira linha do EmulatorView.
+        mRoot = new LinearLayout(this);
+        mRoot.setOrientation(LinearLayout.VERTICAL);
         mContainer = new FrameLayout(this);
-        setContentView(mContainer);
+        mRoot.addView(mContainer, new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, 0, 1f));
+        setContentView(mRoot);
+        ContentInsets.apply(this);
 
         if (!mStore.setupDone()) {
             startActivityForResult(new Intent(this, SetupActivity.class), REQ_SETUP);
@@ -119,23 +131,22 @@ public class MainActivity extends Activity {
             TextView banner = new TextView(this);
             banner.setText("Fallback: " + plan.reason);
             banner.setTextColor(0xFFFFFFFF);
-            banner.setBackgroundColor(0xA0000000);
+            banner.setBackgroundColor(0xFF37474F);
             banner.setTextSize(14f);
             banner.setPadding(24, 12, 24, 12);
-            FrameLayout.LayoutParams blp = new FrameLayout.LayoutParams(
-                    FrameLayout.LayoutParams.MATCH_PARENT,
-                    FrameLayout.LayoutParams.WRAP_CONTENT,
-                    Gravity.TOP);
-            mContainer.addView(banner, blp);
-            mContainer.bringChildToFront(banner);
+            mRoot.addView(banner, 0, new LinearLayout.LayoutParams(
+                    LinearLayout.LayoutParams.MATCH_PARENT,
+                    LinearLayout.LayoutParams.WRAP_CONTENT));
         }
 
         ExtraKeysView extraKeys = new ExtraKeysView(this, mTerm);
-        FrameLayout.LayoutParams lp = new FrameLayout.LayoutParams(
-                FrameLayout.LayoutParams.MATCH_PARENT,
-                FrameLayout.LayoutParams.WRAP_CONTENT,
-                Gravity.BOTTOM);
-        mContainer.addView(extraKeys, lp);
+        // Abaixo do terminal (não sobreposto): o TUI usa a última linha para
+        // status/entrada; a linha de teclas não pode escondê-la. O PTY recebe
+        // a altura reduzida no onSizeChanged do EmulatorView.
+        LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT);
+        mRoot.addView(extraKeys, lp);
     }
 
     private static final class AssetHandle implements AutoCloseable {
@@ -182,7 +193,14 @@ public class MainActivity extends Activity {
     protected void onActivityResult(int requestCode, int resultCode, Intent data) {
         super.onActivityResult(requestCode, resultCode, data);
         if (requestCode == REQ_SETUP) {
-            runFlow();
+            // PULAR grava skipped=true e devolve RESULT_CANCELED; SALVAR grava
+            // provider. BACK não grava nada — nesse caso o fluxo não pode
+            // começar sem configuração (gate do onCreate seria burlado).
+            if (mStore.setupDone()) {
+                runFlow();
+            } else {
+                finish();
+            }
         }
     }
 

@@ -31,14 +31,19 @@ Deliberately **not** copied:
 
 ## Source modifications vs upstream
 
-Um arquivo alterado, por incompatibilidade de toolchain (nada de mudança de
-comportamento):
-
 1. **`PaintRenderer.java`** — `android.util.FloatMath` (removido do SDK após
    API 22; upstream compilava com `compileSdkVersion 22`) → `java.lang.Math`:
    - removido `import android.util.FloatMath;`
    - `FloatMath.ceil(x)` → `Math.ceil(x)` nas duas chamadas (o resultado já era
      convertido para `int`; arredondamento idêntico).
+
+2. **`EmulatorView.java`** — no modo cooked IME, o `inputType` agora inclui
+   `TYPE_TEXT_VARIATION_VISIBLE_PASSWORD | TYPE_TEXT_FLAG_NO_SUGGESTIONS`
+   (além de `TYPE_CLASS_TEXT`). Motivo: o Gboard em `TYPE_NULL` entrega letras
+   como key events, e o modificador Ctrl one-shot (`mControlKey`) só é aplicado
+   no caminho `commitText` (`mapControlChar`); com a variação de senha o
+   teclado usa commitText sem autocorreção/sugestões. `TermController` chama
+   `setUseCookedIME(true)`.
 
 Todos os demais arquivos de `src/main/java` e `src/main/res` são byte-idênticos
 ao upstream commit `35188f8a` (verificado com `diff -r`).

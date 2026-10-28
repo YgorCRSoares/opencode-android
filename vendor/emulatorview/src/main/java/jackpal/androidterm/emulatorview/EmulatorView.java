@@ -628,9 +628,11 @@ public class EmulatorView extends View implements GestureDetector.OnGestureListe
 
     @Override
     public InputConnection onCreateInputConnection(EditorInfo outAttrs) {
-        outAttrs.inputType = mUseCookedIme ?
-                EditorInfo.TYPE_CLASS_TEXT :
-                EditorInfo.TYPE_NULL;
+        outAttrs.inputType = mUseCookedIme
+                ? EditorInfo.TYPE_CLASS_TEXT
+                        | EditorInfo.TYPE_TEXT_VARIATION_VISIBLE_PASSWORD
+                        | EditorInfo.TYPE_TEXT_FLAG_NO_SUGGESTIONS
+                : EditorInfo.TYPE_NULL;
         return new BaseInputConnection(this, true) {
             /**
              * Used to handle composing text requests

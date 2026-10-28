@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!--
+      Tema base do app. O Android 15+ força edge-to-edge em targetSdk 35+;
+      sem esta sobreposição explícita, o ActionBarOverlayLayout coloca o
+      conteúdo em [0,0] atrás da status bar/ActionBar, escondendo o
+      formulário de setup e as primeiras linhas do terminal.
+    -->
+    <style name="AppTheme" parent="@android:style/Theme.Material.Light">
+        <item name="android:windowActionBarOverlay">false</item>
+        <item name="android:windowActionModeOverlay">false</item>
+    </style>
+</resources>

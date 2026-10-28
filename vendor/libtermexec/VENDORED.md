@@ -37,7 +37,12 @@ Deliberately **not** copied:
 1. **`TermExec.java`** — removed `import android.support.annotation.NonNull` and its
    eight `@NonNull` annotations. Reason: they would pull the EOL
    `com.android.support:support-annotations` artifact (jcenter era) for annotations only.
-   No signature/behavior change.
+   **Behavior fix (2026-10-28):** upstream removes `command[0]` and the native
+   `createSubprocessInternal` builds `argv` only from the remaining arguments, so a
+   one-element command produced `execv(cmd, NULL)` (logcat: `process ... with NULL
+   argv: empty string added`) and a multi-element command lost the executable as
+   `argv[0]`. The Java side now prepends `cmd` back before calling `createSubprocess`,
+   matching the API documented below (`argv[0]` is the executable).
 2. **`process.cpp`** — three minimal fixes for NDK r28's clang (default C++17):
    - added `#include <string.h>` (upstream relied on transitive declarations of
      `strcmp`/`memset`/`strerror`);
