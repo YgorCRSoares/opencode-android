@@ -1,0 +1,36 @@
+Validação no Galaxy S26+ (SM-S947B, m2s, arm64-v8a, Android 17/SDK 37)
+Data: 2026-10-28
+
+Instalação/plano:
+- install result=UPTODATE
+- MainActivity: plan=RUNTIME reason=ok
+- Processos: dev.opencode.terminal (27089), libopencode2.so (27151),
+  libopencode2.so serve --service (27759)
+
+Runtime:
+- Binário executado do diretório nativo do APK:
+  /data/app/.../lib/arm64/libopencode2.so
+- libopentui.so e libpcre2-8.so no mesmo diretório; LD_LIBRARY_PATH/OPENTUI_LIB_PATH
+  definidos por EnvBuilder.
+- rg: symlink files/bin/rg -> nativeLibraryDir/librg.so
+  `rg --version` = ripgrep 15.2.0 (+pcre2, JIT disponível).
+
+TUI e turno LLM:
+- TUI do OpenCode 2 renderizou no PTY (80x24 inicial; updateSize ligado).
+- Modelo selecionado pelo próprio TUI: Nemotron 3.5 Lightning Free (OpenCode Zen).
+- Prompt inofensivo: "Responda apenas OK"
+- Resultado: thought 392ms; resposta "OK"; 5,2s; 7,1 tok/s.
+- Nenhuma API key foi solicitada, digitada ou registrada nesta validação;
+  o Setup estava em skipped=true (auth/key do TUI é responsabilidade do usuário).
+
+APK final reinstalado (2026-10-28 17:26):
+- install result=UPTODATE; MainActivity: plan=RUNTIME reason=ok.
+- TUI abriu; novo turno inofensivo "Responda apenas OK".
+- Modelo selecionado pelo TUI: Flint 40B Free (OpenCode Zen).
+- Resultado final: thought 631ms; resposta "OK"; 1,5s; 96,9 tok/s.
+- Nenhuma key usada; mesma política de skipped=true.
+
+Evidências visuais:
+- phone-tui-ready.png
+- phone-llm-turn.png       (turno anterior, Nemotron 3.5 Lightning Free)
+- phone-final-llm.png      (APK final, Flint 40B Free)

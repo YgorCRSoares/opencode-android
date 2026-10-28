@@ -25,7 +25,17 @@ Debug Android 2026-10-28 (AVD x86_64, plano FALLBACK após fix de ABI):
 
 O AVD não é gate da TUI arm64: o exec do binário arm64 a partir do app retorna
 EACCES via libndk_translation (modo 755, SELinux concedeu execute, /data sem
-noexec). O S26+ é arm64 primário nativo. Ainda não validado no PC: o runtime
-arm64 dentro do APK no aparelho (só via qemu) e um turno LLM com provedor real
-(só contra o mock). Esses são os gates da aceitação no Galaxy S26+; o APK está
-pronto para instalar quando o pareamento de depuração sem fio for informado.
+noexec). O S26+ é arm64 primário nativo.
+
+Aceitação no Galaxy S26+ (2026-10-28, arm64-v8a, Android 17/SDK 37):
+  phone-tui-ready.png     TUI real do OpenCode 2 renderizada no aparelho
+  phone-llm-turn.png      turno LLM real: prompt "Responda apenas OK" -> OK
+  phone-final-llm.png     APK final reinstalado: mesmo turno -> OK (Flint 40B Free)
+  phone-runtime.txt       plano RUNTIME, binários nativos, rg 15.2.0, latências
+
+Aprendizado do aparelho: o APK precisa executar o runtime do diretório nativo
+extraído (lib/arm64/libopencode2.so), não de files/: no targetSdk 36 o domínio
+untrusted_app bloqueia execve de arquivos graváveis do app (Android 10+ W^X).
+O binário, libopentui.so, librg.so e libpcre2-8.so são empacotados em jniLibs;
+files/bin/rg é um symlink para o librg.so nativo. Nenhuma API key foi usada ou
+exposta nessa validação; o modelo gratuito do próprio TUI respondeu.

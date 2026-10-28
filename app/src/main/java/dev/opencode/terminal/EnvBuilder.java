@@ -39,6 +39,16 @@ public final class EnvBuilder {
      * é conhecido — provider desconhecido não exporta nada.
      */
     public static Map<String, String> build(File filesDir, String provider, String apiKey) {
+        return build(filesDir, null, provider, apiKey);
+    }
+
+    /**
+     * Variante do runtime: além do ambiente base, aponta o dlopen do
+     * {@code libopentui.so} e o carregamento de bibliotecas para o diretório
+     * nativo extraído do APK.
+     */
+    public static Map<String, String> build(File filesDir, String nativeLibDir,
+            String provider, String apiKey) {
         String home = new File(filesDir, "home").getAbsolutePath();
         Map<String, String> env = new HashMap<>();
         env.put("HOME", home);
@@ -52,6 +62,12 @@ public final class EnvBuilder {
         env.put("XDG_DATA_HOME", home + "/.local/share");
         env.put("XDG_CACHE_HOME", home + "/.cache");
         env.put("OPENCODE_DISABLE_AUTOUPDATE", "true");
+
+        if (nativeLibDir != null && !nativeLibDir.isEmpty()) {
+            env.put("OPENTUI_LIB_PATH", new File(nativeLibDir, "libopentui.so").getAbsolutePath());
+            env.put("LD_LIBRARY_PATH", nativeLibDir);
+            env.put("OPENCODE_EXPERIMENTAL_DISABLE_FILEWATCHER", "true");
+        }
 
         if (apiKey != null && !apiKey.isEmpty()) {
             String keyVar = KEY_VARS.get(provider);

@@ -92,10 +92,15 @@ public class MainActivity extends Activity {
 
         Log.i(TAG, "install result=" + result);
 
-        File runtimeDir = new File(getFilesDir(), "opencode");
-        File wrapper = new File(runtimeDir, "opencode2");
-        File runtimeBin = new File(runtimeDir, "opencode2.bin");
-        boolean wrapperPresent = wrapper.isFile() && runtimeBin.isFile();
+        // Os executáveis do runtime ficam no diretório de bibliotecas nativas
+        // do APK, não em filesDir: desde o Android 10 (targetSdk >= 29) o
+        // domínio untrusted_app não pode executar arquivos graváveis do app.
+        // O diretório nativo é extraído pelo PackageManager (extractNativeLibs)
+        // e tem contexto/permissão de execução.
+        String nativeLibDir = getApplicationInfo().nativeLibraryDir;
+        File runtimeBin = new File(nativeLibDir, "libopencode2.so");
+        File runtimeLib = new File(nativeLibDir, "libopentui.so");
+        boolean runtimePresent = runtimeBin.isFile() && runtimeLib.isFile();
 
         // O runtime pinado é arm64-v8a. Só o usamos quando arm64 é a ABI
         // primária. No AVD x86_64, arm64-v8a aparece como ABI secundária via
@@ -104,8 +109,11 @@ public class MainActivity extends Activity {
         // diagnóstico; no telefone arm64 nativo o runtime é usado.
         String[] supportedAbis = android.os.Build.SUPPORTED_ABIS != null
                 ? android.os.Build.SUPPORTED_ABIS : new String[0];
-        TermBridge.Plan plan = TermBridge.planFor(supportedAbis, wrapperPresent);
-        if (result == RuntimeInstaller.InstallResult.FAILED) {
+        TermBridge.Plan plan = TermBridge.planFor(supportedAbis, runtimePresent);
+        // A extração do zip legado não é o caminho de execução (os binários vêm
+        // de nativeLibraryDir). Só caímos no diagnóstico se o runtime nativo
+        // também estiver ausente; uma falha do zip não pode bloquear o APK atual.
+        if (result == RuntimeInstaller.InstallResult.FAILED && !runtimePresent) {
             plan = new TermBridge.Plan(TermBridge.Mode.FALLBACK, "install_failed");
         }
         Log.i(TAG, "plan=" + plan.mode + " reason=" + plan.reason);
@@ -115,15 +123,20 @@ public class MainActivity extends Activity {
 
         String[] argv;
         if (plan.mode == TermBridge.Mode.RUNTIME) {
-            // TermExec usa execv(3), que NÃO pesquisa o PATH. Com "sh" o
-            // execv falha com ENOENT e o filho sai 255 sem escrever nada.
-            // Use o mesmo caminho absoluto do fallback.
-            argv = new String[] {"/system/bin/sh", wrapper.getAbsolutePath()};
+            // Caminho absoluto direto: TermExec usa execv(3), que não pesquisa
+            // PATH. O binário é PIE e está no diretório nativo executável.
+            argv = new String[] {runtimeBin.getAbsolutePath()};
+            try {
+                RuntimeLinks.ensureRipgrepLink(getFilesDir(), new File(nativeLibDir));
+            } catch (IOException e) {
+                Log.w(TAG, "não foi possível criar o link do rg; a busca pode falhar", e);
+            }
         } else {
             argv = new String[] {"/system/bin/sh"};
         }
 
-        mTerm.start(argv, EnvBuilder.build(getFilesDir(), mStore.provider(), mStore.apiKey()), null);
+        mTerm.start(argv, EnvBuilder.build(
+                getFilesDir(), nativeLibDir, mStore.provider(), mStore.apiKey()), null);
 
         if (plan.mode == TermBridge.Mode.FALLBACK) {
             TextView banner = new TextView(this);

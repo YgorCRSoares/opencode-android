@@ -5,6 +5,7 @@
 
     <application
         android:label="OpenCode Terminal"
+        android:extractNativeLibs="true"
         android:theme="@style/AppTheme">
 
         <activity

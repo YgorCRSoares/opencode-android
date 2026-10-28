@@ -106,63 +106,85 @@ Não há `libc++_shared`/`libtagfix` (eram da v1). O wrapper **suporta layout fl
 (procura os dois arquivos no mesmo diretório do wrapper, via `$DIR`) e o `PREFIX` é
 `${PREFIX:-...}` — sobrescrevível.
 
+**Android 10+ / targetSdk 36 (W^X):** o S26+ provou que `untrusted_app` **não pode
+executar** `opencode2.bin` a partir de `files/` (o filho saía 126, apesar de 755).
+O caminho de execução é o diretório nativo extraído do APK
+(`/data/app/.../lib/arm64/`), que tem contexto/permissão de execução. Por isso o
+runtime é empacotado em `jniLibs/arm64-v8a/`:
+
 ```
+app/src/main/jniLibs/arm64-v8a/
+├── libopencode2.so     # opencode2.bin (PIE aarch64) — execve direto
+├── libopentui.so       # dlopen via OPENTUI_LIB_PATH
+├── librg.so            # ripgrep (executado via symlink em files/bin/rg)
+└── libpcre2-8.so       # sidecar do rg (RUNPATH=$ORIGIN)
+
 /data/data/dev.opencode.terminal/files/
-├── .extracted_marker          # marca extração concluída (com versão)
+├── .extracted_marker          # marca extração do zip legado (com versão)
 ├── home/                      # $HOME do OpenCode (config, auth, cache)
-│   ├── .config/opencode/      # opencode.json
+│   ├── .config/opencode/      # opencode.json + auth
 │   └── .local/share/opencode/ # auth.json, sessões (persistem entre sessões)
 ├── prefix/                    # $PREFIX nosso (nunca o default Termux)
-└── opencode/                  # LAYOUT FLAT do zip, extraído tal-qual
-    ├── opencode2              # wrapper (invocado via `sh <wrapper>`)
-    ├── opencode2.bin
-    └── libopentui.so
+├── tmp/                       # TMPDIR
+└── bin/
+    └── rg -> /data/app/.../lib/arm64/librg.so  # symlink
 ```
 
-**Decisão:** spawn = `sh files/opencode/opencode2` — o `sh` ignora o shebang Termux,
-`readlink/dirname/pwd` do toybox do Android satisfazem o script, e o layout flat
-resolve os caminhos via `$DIR`. O env do spawn define `PREFIX=$FILES/prefix` para
-nunca cair no default Termux. O wrapper exporta `OPENTUI_LIB_PATH` (absoluto) +
-`LD_LIBRARY_PATH` — ou seja, o mecanismo de dlopen do `.so` é do próprio wrapper.
-Pré-requisito já verificado: Termux faz exatamente esse dlopen de `.so` no dir de
-dados do próprio app e funciona sem root.
+**Decisão:** spawn = caminho absoluto de `nativeLibraryDir/libopencode2.so` (sem
+wrapper e sem `sh`). `EnvBuilder` define `OPENTUI_LIB_PATH` (absoluto),
+`LD_LIBRARY_PATH=nativeLibraryDir` e `OPENCODE_EXPERIMENTAL_DISABLE_FILEWATCHER=true`;
+`PREFIX=$FILES/prefix` evita o default Termux. O `rg` é procurado no `PATH`
+(`$FILES/bin`), onde um symlink aponta para `nativeLibraryDir/librg.so`; o kernel
+resolve o link e aplica a permissão do arquivo nativo. O `libpcre2-8.so` fica ao
+lado do `librg.so` e é achado pelo `RUNPATH=$ORIGIN`.
 
-**Contingência (risco R2):** se o linker do Android bloquear dlopen a partir de
-`files/`, reenviar `libopentui.so` como `jniLibs` no APK (instalador extrai para
-`nativeLibraryDir`) e apontar `OPENTUI_LIB_PATH`/`LD_LIBRARY_PATH` para lá.
+O `assets/runtime-arm64.zip` + `RuntimeInstaller` continuam no projeto como
+compatibilidade/diagnóstico e para o layout flat histórico; **não** são o caminho
+de execução no S26+. O wrapper `opencode2` (shebang Termux) também não é usado.
+
+**Contingência (risco R2):** implementada — `libopentui.so` e os executáveis vão
+para `jniLibs`, com `android:extractNativeLibs="true"` /
+`useLegacyPackaging=true`; `OPENTUI_LIB_PATH`/`LD_LIBRARY_PATH` apontam para o
+diretório nativo.
 
 ### 5.3 Fluxo de inicialização
 
 ```
 MainActivity.onCreate
  ├─ 1. Primeira execução? (marker ausente)
- │     └─ SÍ → tela de progresso → extrair assets/runtime-arm64.zip
+ │     └─ SÍ → tela de progresso → extrair assets/runtime-arm64.zip legado
  │              para files/ (barra de progresso real: bytes/descomprimidos)
  │              → escrever marker → prosseguir
  ├─ 2. ABI primária != arm64? (Build.SUPPORTED_ABIS[0] != "arm64-v8a")
  │     └─ SÍ → fallback: spawn de /system/bin/sh no PTY + banner explicando
  │              que a runtime exige arm64 primário (AVD x86_64 de teste)
- ├─ 3. Montar env: HOME, PREFIX=$FILES/prefix, PATH=$FILES/bin:/system/bin,
+ ├─ 3. Runtime nativo presente? (nativeLibraryDir/libopencode2.so +
+ │     libopentui.so); se não → fallback diagnóstico
+ ├─ 4. Montar env: HOME, PREFIX=$FILES/prefix, PATH=$FILES/bin:/system/bin,
  │     SHELL=/system/bin/sh (mksh — o bash tool do OpenCode usa $SHELL),
  │     TERM=xterm-256color, LANG, TMPDIR, XDG_*,
  │     OPENCODE_DISABLE_AUTOUPDATE=1 (sem update-check offline, M2),
- │     chaves de provider (§5.5)
- ├─ 4. PTY via libtermexec → winsize inicial 80x24 (TIOCSWINSZ) e atualização
- │     no updateSize; spawn: `/system/bin/sh $FILES/opencode/opencode2` (§5.2)
+ │     OPENTUI_LIB_PATH/LD_LIBRARY_PATH=nativeLibraryDir,
+ │     OPENCODE_EXPERIMENTAL_DISABLE_FILEWATCHER=true, chaves de provider (§5.5)
+ ├─ 5. Criar symlink files/bin/rg → nativeLibraryDir/librg.so (idempotente;
+ │     substitui o rg extraído do zip legado)
+ ├─ 6. PTY via libtermexec → winsize inicial 80x24 (TIOCSWINSZ) e atualização
+ │     no updateSize; spawn direto: nativeLibraryDir/libopencode2.so (§5.2)
  │     └─ falha de exec → fallback sh + painel de erro legível (anti-meta)
- └─ 5. TermSession + EmulatorView na tela; extra-keys row acima do teclado
+ └─ 7. TermSession + EmulatorView na tela; extra-keys row acima do teclado
 ```
 
 > **ABI primária:** o arm64 só conta como runtime quando é
 > `Build.SUPPORTED_ABIS[0]`. No AVD x86_64, `arm64-v8a` é secundária via
-> `libndk_translation`: o shell executa o wrapper, mas o `execve` feito pelo
-> processo do app (`untrusted_app`) retorna `EACCES` mesmo com o binário 755,
-> SELinux concedendo `execute` e `/data` sem `noexec`. Isso é limitação da
-> bridge no AVD, não do S26+ arm64 nativo; a TUI é validada no aparelho.
+> `libndk_translation`: o `execve` feito pelo processo do app
+> (`untrusted_app`) retorna `EACCES`; isso é limitação da bridge no AVD, não do
+> S26+ arm64 nativo. No celular, o runtime é validado no aparelho.
 >
-> **`execv` e PATH:** o `TermExec` usa `execv(3)`, que não pesquisa `PATH`.
-> Passar `{"sh", wrapper}` faz o filho sair 255 sem escrever nada; o argv do
-> runtime precisa ser `{"/system/bin/sh", wrapper}`.
+> **`execv` e caminho absoluto:** o `TermExec` usa `execv(3)`, que não pesquisa
+> `PATH`. O argv do runtime é o caminho absoluto
+> `nativeLibraryDir/libopencode2.so`; o antigo workaround
+> `{"/system/bin/sh", wrapper}` foi substituído (o wrapper não é mais o caminho
+> de execução).
 
 - **Extração:** um único asset `runtime-arm64.zip` (o release já é zip; reempacotamos
   no formato do nosso layout durante o build no PC). ~10–30 s no armazenamento do
@@ -205,8 +227,11 @@ mecanismo de auth do OpenCode v2 na documentação oficial.
 rápido possível — é onde os riscos R1 (parser) e R2 (linker) se materializam.
 
 **Critério de aceite (§5.9):** T2/T3 verdes = **turno LLM real** completado, não só
-renderização — T2 com key via env do emulador (nunca commitada), T3 com key digitada
-no app no celular.
+renderização — T2 com key via env do emulador (nunca commitada); T3 com a key
+digitada **somente no celular**, quando o usuário optar por um provider pago.
+A validação de 2026-10-28 no S26+ usou o modelo gratuito do próprio TUI (OpenCode
+Zen), sem key, e satisfez o critério de turno real; o caminho de key do Setup
+continua disponível e não foi exercitado nessa rodada.
 
 ### 5.7 Estrutura do repositório (planejada)
 
@@ -215,11 +240,17 @@ opencode-android/
 ├── docs/superpowers/specs/2026-10-27-opencode-terminal-design.md  # este doc
 ├── app/
 │   ├── src/main/java/dev/opencode/terminal/   # MainActivity, SetupActivity,
-│   │                                           # RuntimeInstaller, TermBridge, ExtraKeysView
+│   │                                           # TermBridge, ExtraKeysView,
+│   │                                           # EnvBuilder, RuntimeLinks, PtyWindowSizer
 │   ├── src/main/cpp/                          # JNI (libtermexec vendorado + ponte)
-│   ├── src/main/assets/runtime-arm64.zip      # gerado pelo script de build (não commitar)
+│   ├── src/main/jniLibs/arm64-v8a/             # runtime executável (não commitar)
+│   │   ├── libopencode2.so
+│   │   ├── libopentui.so
+│   │   ├── librg.so
+│   │   └── libpcre2-8.so
+│   ├── src/main/assets/runtime-arm64.zip      # zip legado (não commitar)
 │   └── vendor/emulatorview/ + vendor/libtermexec/  # código jackpal com NOTICE/LICENSE
-├── scripts/fetch-runtime.sh                   # baixa release, reempacota pro nosso layout
+├── scripts/fetch-runtime.sh                   # baixa release, gera jniLibs + zip
 ├── build.sh                                   # entrypoint (já existe, estendido)
 └── tests/ansi-stress.sh                       # gerador de sequências p/ T1
 ```
@@ -234,15 +265,20 @@ baixado e inspecionado no PC (ELF/strings/wrapper). Resultados:
 | Linkage | ✅ bionic puro: interpreter `/system/bin/linker64`, "for Android 28/29", NDK r28c — **sem glibc** |
 | Libs NEEDED | ✅ só `libc.so`, `libm.so`, `libdl.so` — sem `libc++_shared.so` extra |
 | Paths `/data/data/com.termux` escondidos no binário | ✅ nenhum (strings verificado) |
-| Wrapper Termux | ✅ contornável: shebang ignorado via `sh <wrapper>`; `PREFIX="${PREFIX:-...}"` sobrescrevível; **layout flat suportado** |
+| Wrapper Termux | ✅ legado: shebang ignorado via `sh <wrapper>`; não é mais o caminho de execução no S26+ |
+| Execução no S26+ (Android 10+ W^X) | ✅ `untrusted_app` não executa `files/` (status 126); binário em `nativeLibraryDir/libopencode2.so` executa e a TUI sobe |
 | 16 KB page alignment (Android 16) | ✅ LOAD align 0x4000/0x10000 (≥16 KB) em bin e `.so` — seguro no S26+ |
 | Update-check offline (M2) | ✅ env `OPENCODE_DISABLE_AUTOUPDATE` existe — será setado no spawn |
 | TLS sem rede de certs | ✅ binário Bun compila com CA embutida (a confirmar no T2) |
 | ripgrep incluso? | ❌ não vem no zip — vendorizar separadamente (§5.1) |
 | git incluso? | ❌ não vem; e o Android não tem git — **ver §5.9** |
 
-O que a inspeção **não** prova (vira gate no T2): execução real + boot da TUI no
+O que a inspeção **não** prova (vira gate no T2/T3): execução real + boot da TUI no
 dispositivo, dlopen efetivo do `libopentui.so`, e um turno LLM ponta-a-ponta.
+**Validado no S26+ em 2026-10-28:** TUI real, `rg 15.2.0`, turno LLM real
+(`Responda apenas OK` → `OK`; Flint 40B Free, 1,5 s, 96,9 tok/s, repetido no
+APK final), sem key. Evidências: `docs/evidence/phone-*.png` e
+`phone-runtime.txt`.
 
 ### 5.9 Decisões de escopo derivadas da verificação
 
@@ -258,8 +294,10 @@ dispositivo, dlopen efetivo do `libopentui.so`, e um turno LLM ponta-a-ponta.
 - **Barra de aceite do teste (decisão do usuário, 2026-10-27): turno LLM real.**
   T2/T3 só contam como verdes quando uma conversa real com o agente funcionar de
   ponta a ponta (isso exercita TLS + auth + rede de verdade). Provisionamento da key
-  no teste: T2 via env do emulador; T3 você digita no setup do app no celular —
-  **nada de key hardcoded no repo (regra da casa)**.
+  no teste: T2 via env do emulador; T3 **somente no celular**, se você optar por um
+  provider pago — **nada de key hardcoded no repo (regra da casa)**. Em 2026-10-28 o
+  S26+ fechou o gate com o modelo gratuito do TUI (OpenCode Zen), sem key; o Setup
+  de key continua disponível e não foi exercitado nessa rodada.
 - **Armazenamento da API key (decisão do usuário, 2026-10-27): SharedPreferences
   simples** (armazenamento privado do app; suficiente para app pessoal não publicado).
   Keystore/EncryptedSharedPreferences: opcional depois.
@@ -274,19 +312,20 @@ dispositivo, dlopen efetivo do `libopentui.so`, e um turno LLM ponta-a-ponta.
 | # | Risco | Prob. | Contingência |
 |---|---|---|---|
 | **R1** | Parser VT100 do jackpal não cobre algo que a OpenTUI usa (truecolor? bracketed paste? mouse?) | média | **Spike T2 cedo**; patchear o parser (Apache-2.0 permite, é nosso fork); alternativa: outro lib permissivo |
-| **R2** | Linker Android bloquear dlopen em `files/` | baixa | jniLibs no APK → `nativeLibraryDir` (§5.2) |
-| **R3** | Wrapper do guysoft acoplar a layout Termux | **baixa (verificado §5.8)** | layout flat + `PREFIX` override confirmados na inspeção; `sh <wrapper>` ignora shebang |
+| **R2** | Linker/W^X bloquear dlopen ou exec em `files/` | **confirmado no S26+** | implementado: `jniLibs` → `nativeLibraryDir`; exec direto + `OPENTUI_LIB_PATH`/`LD_LIBRARY_PATH`; `rg` via symlink (§5.2) |
+| **R3** | Wrapper do guysoft acoplar a layout Termux | **irrelevante** | wrapper não é usado no caminho de execução; env replicado no `EnvBuilder` |
 | **R4** | Release B1 quebrar silenciosamente em update upstream | média | pinagem por versão + SHA256 no `fetch-runtime.sh`; B2 mitiga |
 | **R5** | AVD arm64 indisponível/lento demais no TCG | **baixa** | imagem `android-36;google_apis;arm64-v8a` **confirmada (rev 7)**; T2b (qemu-user) como smoke rápido |
 | **R6** | `libtermexec` antigo não compilar com AGP 8/NDK 28 | média | é C pequeno; corrigir warnings ou reescrever a ponte JNI (~100 linhas) |
 | **R7** | mksh (`/system/bin/sh`) insuficiente p/ bash tool do agente | baixa | vendorizar bash estático (§5.9); verificar no T2 |
-| **R8** | TLS falhar em runtime (CA embutida Bun não cobre algo) | baixa | verificar no T2 com turno real; se falhar, exportar `SSL_CERT_FILE`/vendor de certs |
+| **R8** | TLS falhar em runtime (CA embutida Bun não cobre algo) | **baixa (validado)** | turno real no S26+ em 2026-10-28; se regredir, exportar `SSL_CERT_FILE`/vendor de certs |
 
 ## 7. O que fica para o builder (decisões suas)
 
 - Formato exato da integração JNI (manter Android.mk do jackpal via `ndkBuild` vs.
   reescrever em CMake/clang) e layout do `vendor/`.
-- Extração: armazenar `runtime-arm64.zip` como asset comprimido vs. extraído no build.
+- Empacotamento: runtime em `jniLibs` (executável no `nativeLibraryDir`) + zip
+  legado; `fetch-runtime.sh` gera os dois layouts.
 - Fonte do ripgrep (pacote Termux bionic vs. binário musl estático vs. build com NDK,
   §5.1) — pinar versão + SHA256.
 - UX do setup de API key e mecanismo de auth final (§5.5, após verificar docs oficiais).

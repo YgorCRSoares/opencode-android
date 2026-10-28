@@ -39,6 +39,30 @@ public class EnvBuilderTest {
     }
 
     @Test
+    public void runtimeEnvPointsToNativeLibraries() {
+        File filesDir = temporaryFolder.getRoot();
+        String nativeLibDir = new File(filesDir, "native-libs").getAbsolutePath();
+
+        Map<String, String> env = EnvBuilder.build(filesDir, nativeLibDir, "anthropic", null);
+
+        assertEquals("base (11) + runtime (3)", 14, env.size());
+        assertEquals(nativeLibDir + "/libopentui.so", env.get("OPENTUI_LIB_PATH"));
+        assertEquals(nativeLibDir, env.get("LD_LIBRARY_PATH"));
+        assertEquals("true", env.get("OPENCODE_EXPERIMENTAL_DISABLE_FILEWATCHER"));
+    }
+
+    @Test
+    public void runtimeEnvWithKeyAddsOnlyTheKeyVar() {
+        File filesDir = temporaryFolder.getRoot();
+        String nativeLibDir = new File(filesDir, "native-libs").getAbsolutePath();
+
+        Map<String, String> env = EnvBuilder.build(filesDir, nativeLibDir, "openai", "sk-oai");
+
+        assertEquals(15, env.size());
+        assertEquals("sk-oai", env.get("OPENAI_API_KEY"));
+    }
+
+    @Test
     public void anthropicKeyExportsAnthropicVar() {
         File filesDir = temporaryFolder.getRoot();
 

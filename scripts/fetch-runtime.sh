@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 # Baixa, valida (SHA256) e reempacota o runtime pinado do OpenCode (arm64) + ripgrep
 # + libpcre2-8 (dependência do rg ausente no Termux .deb).
-# Produz: app/src/main/assets/runtime-arm64.zip (5 entradas, nunca commitado).
+# Produz: app/src/main/assets/runtime-arm64.zip (5 entradas, nunca commitado)
+# e app/src/main/jniLibs/arm64-v8a/ (binários executáveis, nunca commitados).
 # shellcheck disable=SC2016  # '$ORIGIN' é literal (RUNPATH do ELF), não expansão shell.
 set -euo pipefail
 
@@ -24,6 +25,8 @@ PROJECT_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 readonly PROJECT_ROOT
 OUTPUT_ZIP="$PROJECT_ROOT/app/src/main/assets/runtime-arm64.zip"
 readonly OUTPUT_ZIP
+JNI_DIR="$PROJECT_ROOT/app/src/main/jniLibs/arm64-v8a"
+readonly JNI_DIR
 
 STAGING_DIR="$(mktemp -d)"
 readonly STAGING_DIR
@@ -179,6 +182,29 @@ if [[ "$rg_runpath" != '$ORIGIN' ]]; then
     exit 1
 fi
 
+# ----- Layout de execução no APK (Android 10+ W^X) -----
+# filesDir é gravável e untrusted_app não pode executar de lá. O diretório
+# nativo extraído do APK tem contexto/permissão de execução; os nomes viram
+# lib*.so para o PackageManager extrair em /data/app/.../lib/arm64/.
+mkdir -p "$JNI_DIR"
+install -m 0755 "$PKG_DIR/opencode/opencode2.bin" "$JNI_DIR/libopencode2.so"
+install -m 0755 "$PKG_DIR/opencode/libopentui.so" "$JNI_DIR/libopentui.so"
+install -m 0755 "$PKG_DIR/bin/rg" "$JNI_DIR/librg.so"
+install -m 0755 "$PKG_DIR/bin/libpcre2-8.so" "$JNI_DIR/libpcre2-8.so"
+
+for native_name in libopencode2.so libopentui.so librg.so libpcre2-8.so; do
+    assert_aarch64_elf "$JNI_DIR/$native_name"
+    if [[ ! -x "$JNI_DIR/$native_name" ]]; then
+        log "native runtime not executable: $JNI_DIR/$native_name" >&2
+        exit 1
+    fi
+done
+if [[ "$(LC_ALL=C readelf -d "$JNI_DIR/librg.so" | sed -n 's/.*(RUNPATH).*\[\(.*\)\]/\1/p')" != '$ORIGIN' ]]; then
+    log "native librg.so RUNPATH is not \$ORIGIN" >&2
+    exit 1
+fi
+log "wrote native runtime: $JNI_DIR"
+
 create_zip() {
     local src_dir="$1"
     local out_file="$2"
@@ -265,6 +291,6 @@ if ! LC_ALL=C readelf -d "$REEXTRACT_DIR/bin/rg" | grep -q 'libpcre2-8\.so'; the
     exit 1
 fi
 
-log "OK: 5 entries, aarch64, bionic-only rg, pcre2 sidecar + RUNPATH \$ORIGIN"
+log "OK: 5 zip entries + 4 native-lib executables, aarch64, bionic-only rg, pcre2 sidecar + RUNPATH \$ORIGIN"
 log "bsdtar -tf:"
 bsdtar -tf "$OUTPUT_ZIP" >&2

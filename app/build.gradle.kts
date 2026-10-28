@@ -38,6 +38,20 @@ android {
         targetCompatibility = JavaVersion.VERSION_17
     }
 
+    packaging {
+        jniLibs {
+            // O runtime é executado via execve; o Android só permite isso no
+            // diretório nativo extraído do APK, não em filesDir (W^X).
+            useLegacyPackaging = true
+            keepDebugSymbols += listOf(
+                "**/libopencode2.so",
+                "**/librg.so",
+                "**/libopentui.so",
+                "**/libpcre2-8.so"
+            )
+        }
+    }
+
     buildTypes {
         release {
             isMinifyEnabled = false

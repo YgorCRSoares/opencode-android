@@ -37,6 +37,7 @@ public final class TermController {
     private ParcelFileDescriptor.AutoCloseOutputStream mOutput;
     private Runnable mSessionEndListener;
     private boolean mStarted;
+    private volatile boolean mPtyClosed;
 
     public TermController(Activity activity, ViewGroup container) {
         mActivity = activity;
@@ -97,9 +98,13 @@ public final class TermController {
             @Override
             public void updateSize(int columns, int rows) {
                 super.updateSize(columns, rows);
-                if (mPtmx != null) {
-                    TermExec.setPtyWindowSize(mPtmx.getFd(), rows, columns);
-                }
+                final ParcelFileDescriptor pty = mPtmx;
+                PtyWindowSizer.apply(
+                        pty == null ? null : pty::getFd,
+                        mPtyClosed,
+                        columns,
+                        rows,
+                        TermExec::setPtyWindowSize);
             }
         };
         session.setTermIn(new ParcelFileDescriptor.AutoCloseInputStream(mPtmx));
@@ -195,23 +200,31 @@ public final class TermController {
     }
 
     public void onDestroy() {
-        if (mSession != null && mSession.isRunning()) {
-            mSession.finish();
-        } else {
-            closeQuietly(mPtmx);
-        }
+        closePty();
     }
 
     private void handleSessionEnd() {
-        if (mSession != null && mSession.isRunning()) {
-            mSession.finish();
-        } else {
-            closeQuietly(mPtmx);
-        }
+        closePty();
         mOverlay.setVisibility(View.VISIBLE);
         mContainer.bringChildToFront(mOverlay);
         if (mSessionEndListener != null) {
             mSessionEndListener.run();
+        }
+    }
+
+    /**
+     * Marca o PTY como fechado antes de encerrar a sessão e fecha o master.
+     *
+     * <p>{@link TermSession#finish()} fecha os streams que compartilham o mesmo
+     * {@code ParcelFileDescriptor}; marcar a flag antes evita que um
+     * {@code updateSize} tardio tente usar um fd já fechado.</p>
+     */
+    private void closePty() {
+        mPtyClosed = true;
+        if (mSession != null && mSession.isRunning()) {
+            mSession.finish();
+        } else {
+            closeQuietly(mPtmx);
         }
     }
 
