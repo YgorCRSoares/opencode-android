@@ -9,3 +9,6 @@ app/src/main/jniLibs/arm64-v8a/libopencode2.so
 app/src/main/jniLibs/arm64-v8a/libopentui.so
 app/src/main/jniLibs/arm64-v8a/librg.so
 app/src/main/jniLibs/arm64-v8a/libpcre2-8.so
+
+# Config de ferramenta (Serena MCP)
+.serena/

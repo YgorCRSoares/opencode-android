@@ -9,5 +9,28 @@
     <style name="AppTheme" parent="@android:style/Theme.Material.Light">
         <item name="android:windowActionBarOverlay">false</item>
         <item name="android:windowActionModeOverlay">false</item>
+        <item name="android:windowBackground">@android:color/black</item>
+    </style>
+
+    <!--
+      Tema exclusivo da MainActivity (SetupActivity continua no AppTheme):
+      sem ActionBar — o topo é a tela preta do terminal — e com status bar e
+      navigation bar pretas, ícones claros, para o conjunto parecer uma tela
+      preta contínua. A status bar NÃO é removida, apenas colorida.
+
+      actionBarSize=0dp: o ContentInsets (fora do escopo de edição) soma
+      actionBarSize ao inset superior quando não encontra a view da ActionBar;
+      com a ActionBar removida esse somatório criaria um vão preto duplicado
+      no topo. Zerar o atributo faz o fallback cair direto no inset do sistema.
+    -->
+    <style name="TerminalTheme" parent="@android:style/Theme.Material.NoActionBar">
+        <item name="android:windowBackground">@android:color/black</item>
+        <item name="android:statusBarColor">#000000</item>
+        <item name="android:navigationBarColor">#000000</item>
+        <item name="android:windowLightStatusBar">false</item>
+        <item name="android:windowLightNavigationBar">false</item>
+        <item name="android:actionBarSize">0dp</item>
+        <item name="android:windowActionBarOverlay">false</item>
+        <item name="android:windowActionModeOverlay">false</item>
     </style>
 </resources>

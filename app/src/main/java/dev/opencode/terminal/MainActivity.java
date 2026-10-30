@@ -5,9 +5,12 @@ import android.app.ProgressDialog;
 import android.content.Intent;
 import android.content.res.AssetFileDescriptor;
 import android.content.res.AssetManager;
+import android.os.Build;
 import android.os.Bundle;
 import android.util.Log;
+import android.view.View;
 import android.view.ViewGroup;
+import android.view.WindowInsetsController;
 import android.widget.FrameLayout;
 import android.widget.LinearLayout;
 import android.widget.TextView;
@@ -48,10 +51,17 @@ public class MainActivity extends Activity {
         // não sobre a primeira linha do EmulatorView.
         mRoot = new LinearLayout(this);
         mRoot.setOrientation(LinearLayout.VERTICAL);
+        // Fundo opaco evita que o wallpaper apareça através de células que a
+        // TUI deixa sem pintura (por exemplo, o espaço do logo no home).
+        mRoot.setBackgroundColor(0xFF000000);
         mContainer = new FrameLayout(this);
+        mContainer.setBackgroundColor(0xFF000000);
         mRoot.addView(mContainer, new LinearLayout.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT, 0, 1f));
         setContentView(mRoot);
+        // O DecorView/WindowInsetsController só existe depois de setContentView;
+        // chamar antes provoca NPE em getWindow().getInsetsController().
+        applySystemBarAppearance();
         ContentInsets.apply(this);
 
         if (!mStore.setupDone()) {
@@ -59,6 +69,35 @@ public class MainActivity extends Activity {
             return;
         }
         runFlow();
+    }
+
+    /**
+     * Status/navigation bar pretas com ícones claros, para o conjunto (barra +
+     * terminal) parecer uma tela preta contínua. A status bar do sistema não é
+     * removida. O tema {@code TerminalTheme} já define as cores; aqui apenas
+     * garantimos a aparência das luzes também no caminho edge-to-edge forçado
+     * (API 35+, onde as cores do tema são ignoradas pela plataforma).
+     */
+    private void applySystemBarAppearance() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+            WindowInsetsController controller = getWindow().getInsetsController();
+            if (controller != null) {
+                controller.setSystemBarsAppearance(0,
+                        WindowInsetsController.APPEARANCE_LIGHT_STATUS_BARS
+                                | WindowInsetsController.APPEARANCE_LIGHT_NAVIGATION_BARS);
+            }
+        } else {
+            // API 28–29: flags legadas (LIGHT_* já desligadas pelo tema escuro;
+            // reafirma para o caso de a ROM iniciar com aparência clara).
+            View decor = getWindow().getDecorView();
+            decor.setSystemUiVisibility(decor.getSystemUiVisibility()
+                    & ~(View.SYSTEM_UI_FLAG_LIGHT_STATUS_BAR
+                            | View.SYSTEM_UI_FLAG_LIGHT_NAVIGATION_BAR));
+        }
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            // Sem scrim translúcido da barra de 3 botões sobre o preto.
+            getWindow().setNavigationBarContrastEnforced(false);
+        }
     }
 
     private void runFlow() {
@@ -150,14 +189,16 @@ public class MainActivity extends Activity {
                     LinearLayout.LayoutParams.WRAP_CONTENT));
         }
 
-        ExtraKeysView extraKeys = new ExtraKeysView(this, mTerm);
-        // Abaixo do terminal (não sobreposto): o TUI usa a última linha para
-        // status/entrada; a linha de teclas não pode escondê-la. O PTY recebe
-        // a altura reduzida no onSizeChanged do EmulatorView.
+        // Teclado QWERTY próprio (substitui a ExtraKeysView): abaixo do
+        // terminal, nunca sobreposto — o TUI usa a última linha para
+        // status/entrada e a linha de teclas não pode escondê-la. A altura
+        // fixa do teclado entra no layout; o PTY recebe a altura reduzida do
+        // EmulatorView no onSizeChanged (mContainer tem weight=1).
+        IKeyboardView keyboard = new IKeyboardView(this, mTerm);
         LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT,
                 LinearLayout.LayoutParams.WRAP_CONTENT);
-        mRoot.addView(extraKeys, lp);
+        mRoot.addView(keyboard, lp);
     }
 
     private static String fallbackMessage(String reason) {

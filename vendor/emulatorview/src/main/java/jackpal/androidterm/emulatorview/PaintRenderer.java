@@ -23,9 +23,13 @@ import android.graphics.Typeface;
 
 class PaintRenderer extends BaseTextRenderer {
     public PaintRenderer(int fontSize, ColorScheme scheme) {
+        this(fontSize, scheme, Typeface.MONOSPACE);
+    }
+
+    public PaintRenderer(int fontSize, ColorScheme scheme, Typeface typeface) {
         super(scheme);
         mTextPaint = new Paint();
-        mTextPaint.setTypeface(Typeface.MONOSPACE);
+        mTextPaint.setTypeface(typeface != null ? typeface : Typeface.MONOSPACE);
         mTextPaint.setAntiAlias(true);
         mTextPaint.setTextSize(fontSize);
 

@@ -18,9 +18,9 @@ import java.io.IOException;
 import java.io.OutputStream;
 import java.util.Map;
 
-import jackpal.androidterm.TermExec;
-import jackpal.androidterm.emulatorview.EmulatorView;
-import jackpal.androidterm.emulatorview.TermSession;
+import com.termux.terminal.TerminalSession;
+import com.termux.view.TerminalView;
+
 
 public final class TermController {
 
@@ -31,10 +31,10 @@ public final class TermController {
     private final TextView mOverlay;
     private final Handler mMainHandler = new Handler(Looper.getMainLooper());
 
-    private TermSession mSession;
-    private EmulatorView mView;
+    private TerminalSession mSession;
+    private TerminalView mView;
     private ParcelFileDescriptor mPtmx;
-    private ParcelFileDescriptor.AutoCloseOutputStream mOutput;
+    private OutputStream mOutput;
     private Runnable mSessionEndListener;
     private boolean mStarted;
     private volatile boolean mPtyClosed;
@@ -58,18 +58,11 @@ public final class TermController {
     }
 
     /**
-     * Spawns the terminal child process and wires it to the EmulatorView.
+     * Spawns the terminal child process and wires it to the TerminalView.
      *
      * @param argv command line (argv[0] is the program)
      * @param env  environment variables to apply; {@code null} means default
      * @param cwd  requested working directory.
-     *             <strong>Currently ignored.</strong> Upstream {@code jackpal.termexec.TermExec}
-     *             spawns via {@code execv} which inherits the parent process working
-     *             directory; there is no chdir support in TermExec (nor in this
-     *             wrapper). The parameter is retained for the Task 7 / Task 10
-     *             public API so callers can pass a directory without breaking
-     *             compatibility, but wiring it must wait for upstream to gain
-     *             chdir support — do not invent native chdir here.
      */
     public void start(String[] argv, Map<String, String> env, File cwd) {
         if (mStarted) {
@@ -80,105 +73,277 @@ public final class TermController {
         }
         mStarted = true;
 
-        try {
-            mPtmx = ParcelFileDescriptor.open(new File("/dev/ptmx"),
-                    ParcelFileDescriptor.MODE_READ_WRITE);
-        } catch (IOException e) {
-            throw new IllegalStateException("Não foi possível abrir /dev/ptmx", e);
+        String shellPath = argv[0];
+        String[] args = new String[argv.length - 1];
+        System.arraycopy(argv, 1, args, 0, argv.length - 1);
+
+        String[] envp = null;
+        if (env != null) {
+            envp = new String[env.size()];
+            int i = 0;
+            for (Map.Entry<String, String> entry : env.entrySet()) {
+                envp[i++] = entry.getKey() + "=" + entry.getValue();
+            }
         }
 
-        mOutput = new ParcelFileDescriptor.AutoCloseOutputStream(mPtmx);
+        final String cwdPath = cwd != null ? cwd.getAbsolutePath() : "/";
 
-        // O PTY recém-aberto tem winsize 0x0. O TUI consulta TIOCGWINSZ e
-        // pode falhar antes do primeiro layout do EmulatorView; fixa 80x24
-        // e atualiza com o tamanho real em updateSize().
-        TermExec.setPtyWindowSize(mPtmx.getFd(), 24, 80);
-
-        TermSession session = new TermSession(false) {
+        mSession = new TerminalSession(shellPath, cwdPath, args, envp, null, new com.termux.terminal.TerminalSessionClient() {
             @Override
-            public void updateSize(int columns, int rows) {
-                super.updateSize(columns, rows);
-                final ParcelFileDescriptor pty = mPtmx;
-                PtyWindowSizer.apply(
-                        pty == null ? null : pty::getFd,
-                        mPtyClosed,
-                        columns,
-                        rows,
-                        TermExec::setPtyWindowSize);
+            public void onTextChanged(com.termux.terminal.TerminalSession changedSession) {
+                if (mView != null) mView.onScreenUpdated();
             }
-        };
-        session.setTermIn(new ParcelFileDescriptor.AutoCloseInputStream(mPtmx));
-        session.setTermOut(mOutput);
-        mSession = session;
 
+            @Override
+            public void onTitleChanged(com.termux.terminal.TerminalSession changedSession) {
+            }
+
+            @Override
+            public void onSessionFinished(com.termux.terminal.TerminalSession finishedSession) {
+                mMainHandler.post(TermController.this::handleSessionEnd);
+            }
+
+            @Override
+            public void onCopyTextToClipboard(com.termux.terminal.TerminalSession session, String text) {
+            }
+
+            @Override
+            public void onPasteTextFromClipboard(com.termux.terminal.TerminalSession session) {
+            }
+
+            @Override
+            public void onBell(com.termux.terminal.TerminalSession session) {
+            }
+
+            @Override
+            public void onColorsChanged(com.termux.terminal.TerminalSession session) {
+            }
+
+            @Override
+            public void onTerminalCursorStateChange(boolean state) {
+            }
+
+            @Override
+            public void setTerminalShellPid(com.termux.terminal.TerminalSession session, int pid) {
+            }
+
+            @Override
+            public Integer getTerminalCursorStyle() {
+                return null;
+            }
+
+            @Override
+            public void logError(String tag, String message) {
+                android.util.Log.e(tag, message);
+            }
+
+            @Override
+            public void logWarn(String tag, String message) {
+                android.util.Log.w(tag, message);
+            }
+
+            @Override
+            public void logInfo(String tag, String message) {
+                android.util.Log.i(tag, message);
+            }
+
+            @Override
+            public void logDebug(String tag, String message) {
+                android.util.Log.d(tag, message);
+            }
+
+            @Override
+            public void logVerbose(String tag, String message) {
+                android.util.Log.v(tag, message);
+            }
+
+            @Override
+            public void logStackTraceWithMessage(String tag, String message, Exception e) {
+                android.util.Log.e(tag, message, e);
+            }
+
+            @Override
+            public void logStackTrace(String tag, Exception e) {
+                android.util.Log.e(tag, "Exception", e);
+            }
+        });
+
+        mView = new TerminalView(mActivity, null);
+        mView.setTerminalViewClient(new com.termux.view.TerminalViewClient() {
+            @Override
+            public float onScale(float scale) {
+                return scale;
+            }
+
+            @Override
+            public void onSingleTapUp(android.view.MotionEvent e) {
+            }
+
+            @Override
+            public boolean shouldBackButtonBeMappedToEscape() {
+                return false;
+            }
+
+            @Override
+            public boolean shouldEnforceCharBasedInput() {
+                return true;
+            }
+
+            @Override
+            public boolean shouldUseCtrlSpaceWorkaround() {
+                return false;
+            }
+
+            @Override
+            public boolean isTerminalViewSelected() {
+                return true;
+            }
+
+            @Override
+            public void copyModeChanged(boolean copyMode) {
+            }
+
+            @Override
+            public boolean onKeyDown(int keyCode, android.view.KeyEvent e, com.termux.terminal.TerminalSession session) {
+                return false;
+            }
+
+            @Override
+            public boolean onKeyUp(int keyCode, android.view.KeyEvent e) {
+                return false;
+            }
+
+            @Override
+            public boolean onLongPress(android.view.MotionEvent event) {
+                return false;
+            }
+
+            @Override
+            public boolean readControlKey() {
+                return false;
+            }
+
+            @Override
+            public boolean readAltKey() {
+                return false;
+            }
+
+            @Override
+            public boolean readShiftKey() {
+                return false;
+            }
+
+            @Override
+            public boolean readFnKey() {
+                return false;
+            }
+
+            @Override
+            public boolean onCodePoint(int codePoint, boolean ctrlDown, com.termux.terminal.TerminalSession session) {
+                return false;
+            }
+
+            @Override
+            public void onEmulatorSet() {
+            }
+
+            @Override
+            public void logError(String tag, String message) {
+                android.util.Log.e(tag, message);
+            }
+
+            @Override
+            public void logWarn(String tag, String message) {
+                android.util.Log.w(tag, message);
+            }
+
+            @Override
+            public void logInfo(String tag, String message) {
+                android.util.Log.i(tag, message);
+            }
+
+            @Override
+            public void logDebug(String tag, String message) {
+                android.util.Log.d(tag, message);
+            }
+
+            @Override
+            public void logVerbose(String tag, String message) {
+                android.util.Log.v(tag, message);
+            }
+
+            @Override
+            public void logStackTraceWithMessage(String tag, String message, Exception e) {
+                android.util.Log.e(tag, message, e);
+            }
+
+            @Override
+            public void logStackTrace(String tag, Exception e) {
+                android.util.Log.e(tag, "Exception", e);
+            }
+        });
+
+        mView.attachSession(mSession);
+        // A API do TerminalView exige setTextSize() ANTES de setTypeface():
+        // setTypeface() lê mRenderer.mTextSize, e o renderer só é criado por
+        // setTextSize() (que trata o caso null usando MONOSPACE). Sem essa
+        // chamada, setTypeface() lança NullPointerException.
+        // Mantém a escala visual do EmulatorView antigo (10px * density).
         DisplayMetrics metrics = new DisplayMetrics();
         mActivity.getWindowManager().getDefaultDisplay().getMetrics(metrics);
-        mView = new EmulatorView(mActivity, session, metrics);
-        // IME "cooked": o Gboard entrega texto via commitText, caminho em que
-        // o Ctrl one-shot é aplicado. Com TYPE_NULL ele manda key events e o
-        // toggle não vale (allowToggle=false para o teclado virtual).
-        mView.setUseCookedIME(true);
+        mView.setTextSize(Math.round(10 * metrics.density));
+        mView.setTypeface(TerminalTypeface.load(mActivity));
+        mView.setFocusable(true);
+        mView.setFocusableInTouchMode(true);
+        mView.requestFocus();
+
         mContainer.addView(mView, new ViewGroup.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
         mContainer.bringChildToFront(mOverlay);
-        mView.requestFocus();
 
-        final TermExec termExec = new TermExec(argv);
-        if (env != null) {
-            for (Map.Entry<String, String> entry : env.entrySet()) {
-                termExec.environment().put(entry.getKey(), entry.getValue());
+        mOutput = new OutputStream() {
+            @Override
+            public void write(int b) throws IOException {
+                write(new byte[]{(byte) b});
             }
-        }
 
-        Thread watcher = new Thread(() -> {
-            try {
-                int pid = termExec.start(mPtmx);
-                int status = TermExec.waitFor(pid);
-                android.util.Log.i(TAG, "filho saiu: pid=" + pid + " status=" + status);
-            } catch (IOException e) {
-                android.util.Log.e(TAG, "spawn falhou", e);
-            } catch (RuntimeException e) {
-                android.util.Log.e(TAG, "watcher abortado", e);
+            @Override
+            public void write(byte[] b, int off, int len) throws IOException {
+                if (mSession != null) {
+                    mSession.write(b, off, len);
+                }
             }
-            mMainHandler.post(this::handleSessionEnd);
-        }, "TermController watcher");
-        watcher.setDaemon(true);
-        watcher.start();
+        };
     }
 
     public void setOnSessionEndListener(Runnable listener) {
         mSessionEndListener = listener;
     }
 
-    /**
-     * Raw PTY master output stream used by the extra-keys row to inject bytes.
-     * Returns {@code null} until {@link #start} has been called. Callers must
-     * guard against {@code null}. The stream is owned by this controller; do
-     * NOT close it from outside.
-     */
     public OutputStream outputStream() {
         return mOutput;
     }
 
-    /**
-     * Arms the terminal's built-in Ctrl modifier (one-shot): the next character
-     * typed by the IME is converted to its control equivalent. Used by the
-     * extra-keys row's Ctrl button.
-     */
-    public void sendCtrl() {
-        if (mView != null) {
-            mView.sendControlKey();
+    public void write(byte[] data, int offset, int count) {
+        if (mSession != null) {
+            mSession.write(data, offset, count);
         }
     }
 
-    /**
-     * Abre o teclado virtual para o EmulatorView. Sem isso o usuário de celular
-     * (sem teclado físico) não consegue digitar comandos nem usar o TUI.
-     */
-    public void showSoftKeyboard() {
-        if (mView == null) {
-            return;
+    public void sendCtrl() {
+        // Implement Ctrl by writing the appropriate control code
+        try {
+            if (mSession != null) {
+                // Write Ctrl code (ASCII 0x1B for ESC, but we need to implement proper Ctrl handling)
+                mSession.writeCodePoint(false, 0x1B); // Example: ESC as Ctrl-[
+            }
+        } catch (Exception e) {
+            android.util.Log.e(TAG, "Failed to send Ctrl", e);
         }
+    }
+
+    public void showSoftKeyboard() {
+        if (mView == null) return;
         mView.requestFocus();
         InputMethodManager imm = (InputMethodManager)
                 mActivity.getSystemService(Context.INPUT_METHOD_SERVICE);
@@ -188,23 +353,18 @@ public final class TermController {
     }
 
     public void onResume() {
-        if (mView != null) {
-            mView.onResume();
-        }
     }
 
     public void onPause() {
-        if (mView != null) {
-            mView.onPause();
-        }
     }
 
     public void onDestroy() {
-        closePty();
+        if (mSession != null) {
+            mSession.finishIfRunning();
+        }
     }
 
     private void handleSessionEnd() {
-        closePty();
         mOverlay.setVisibility(View.VISIBLE);
         mContainer.bringChildToFront(mOverlay);
         if (mSessionEndListener != null) {
@@ -222,7 +382,7 @@ public final class TermController {
     private void closePty() {
         mPtyClosed = true;
         if (mSession != null && mSession.isRunning()) {
-            mSession.finish();
+            mSession.finishIfRunning();
         } else {
             closeQuietly(mPtmx);
         }

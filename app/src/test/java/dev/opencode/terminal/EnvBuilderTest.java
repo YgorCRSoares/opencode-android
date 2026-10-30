@@ -23,7 +23,7 @@ public class EnvBuilderTest {
 
         Map<String, String> env = EnvBuilder.build(filesDir, "anthropic", null);
 
-        assertEquals(11, env.size());
+        assertEquals(12, env.size());
         assertEquals(base + "/home", env.get("HOME"));
         assertEquals(base + "/prefix", env.get("PREFIX"));
         assertEquals(base + "/tmp", env.get("TMPDIR"));
@@ -35,6 +35,7 @@ public class EnvBuilderTest {
         assertEquals(base + "/home/.local/share", env.get("XDG_DATA_HOME"));
         assertEquals(base + "/home/.cache", env.get("XDG_CACHE_HOME"));
         assertEquals("true", env.get("OPENCODE_DISABLE_AUTOUPDATE"));
+        assertEquals("{\"type\":\"home\"}", env.get("OPENCODE_ROUTE"));
         assertFalse("build não pode criar diretórios em disco", filesDir.exists());
     }
 
@@ -45,7 +46,7 @@ public class EnvBuilderTest {
 
         Map<String, String> env = EnvBuilder.build(filesDir, nativeLibDir, "anthropic", null);
 
-        assertEquals("base (11) + runtime (3)", 14, env.size());
+        assertEquals("base (12) + runtime (3)", 15, env.size());
         assertEquals(nativeLibDir + "/libopentui.so", env.get("OPENTUI_LIB_PATH"));
         assertEquals(nativeLibDir, env.get("LD_LIBRARY_PATH"));
         assertEquals("true", env.get("OPENCODE_EXPERIMENTAL_DISABLE_FILEWATCHER"));
@@ -58,7 +59,7 @@ public class EnvBuilderTest {
 
         Map<String, String> env = EnvBuilder.build(filesDir, nativeLibDir, "openai", "sk-oai");
 
-        assertEquals(15, env.size());
+        assertEquals(16, env.size());
         assertEquals("sk-oai", env.get("OPENAI_API_KEY"));
     }
 
@@ -69,7 +70,7 @@ public class EnvBuilderTest {
         Map<String, String> env = EnvBuilder.build(filesDir, "anthropic", "sk-ant-teste");
 
         assertEquals("sk-ant-teste", env.get("ANTHROPIC_API_KEY"));
-        assertEquals("base (11) + exatamente uma key", 12, env.size());
+        assertEquals("base (12) + exatamente uma key", 13, env.size());
     }
 
     /** Demais provedores conhecidos do mapeamento pinado. */
@@ -90,8 +91,8 @@ public class EnvBuilderTest {
         Map<String, String> nula = EnvBuilder.build(filesDir, "anthropic", null);
         Map<String, String> vazia = EnvBuilder.build(filesDir, "anthropic", "");
 
-        assertEquals("nula: só a base", 11, nula.size());
-        assertEquals("vazia: só a base", 11, vazia.size());
+        assertEquals("nula: só a base", 12, nula.size());
+        assertEquals("vazia: só a base", 12, vazia.size());
         assertNoKeyVars(nula);
         assertNoKeyVars(vazia);
     }
@@ -102,7 +103,7 @@ public class EnvBuilderTest {
 
         Map<String, String> env = EnvBuilder.build(filesDir, "deepseek", "sk-desc");
 
-        assertEquals("desconhecido: só a base", 11, env.size());
+        assertEquals("desconhecido: só a base", 12, env.size());
         assertNoKeyVars(env);
     }
 

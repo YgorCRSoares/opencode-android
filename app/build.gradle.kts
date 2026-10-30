@@ -62,5 +62,10 @@ android {
 dependencies {
     // Terminal VT100/xterm vendorizado (jackpal) — ver vendor/emulatorview/VENDORED.md.
     implementation(project(":emulatorview"))
+
+// Terminal emulator and view vendorized from Termux (termux/termux-app)
+// See vendor/terminal-emulator/VENDORED.md and vendor/terminal-view/VENDORED.md
+implementation(project(":terminal-emulator"))
+implementation(project(":terminal-view"))
     testImplementation("junit:junit:4.13.2")
 }

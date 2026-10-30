@@ -62,6 +62,9 @@ public final class EnvBuilder {
         env.put("XDG_DATA_HOME", home + "/.local/share");
         env.put("XDG_CACHE_HOME", home + "/.cache");
         env.put("OPENCODE_DISABLE_AUTOUPDATE", "true");
+        // Abre a rota home (logo + prompt) em vez de restaurar uma sessão
+        // anterior. As abas de sessão continuam disponíveis na tela.
+        env.put("OPENCODE_ROUTE", "{\"type\":\"home\"}");
 
         if (nativeLibDir != null && !nativeLibDir.isEmpty()) {
             env.put("OPENTUI_LIB_PATH", new File(nativeLibDir, "libopentui.so").getAbsolutePath());
