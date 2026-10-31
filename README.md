@@ -1,10 +1,10 @@
 # OpenCode Terminal - Android
 
-A fully functional OpenCode TUI (Text User Interface) running natively on Android. Use OpenCode's terminal features directly from your Android device.
+Uma TUI (Interface de Usuário em Texto) do OpenCode totalmente funcional, rodando nativamente no Android. Utilize os recursos de terminal do OpenCode diretamente do seu dispositivo Android.
 
 ## 📱 Sobre o Aplicativo
 
-OpenCode Terminal traz a interface de linha de comando do OpenCode para o seu celular ou tablet. Execute comandos, gere agents, execute skills e gerencie sessões totalmente pelo dispositivo móvel.
+OpenCode Terminal traz a interface de linha de comando do OpenCode para celular ou tablet. Execute comandos, gere agents, execute skills e gerencie sessões e etc.
 
 ## ✅ Funcionalidades Principais
 
@@ -92,7 +92,7 @@ No interior da TUI:
 
 ## 🤝 Contribuindo
 
-Quer ajudar a melhorar o OpenCode Terminal? Estamos abertos a contribuições! 🎉
+Fique à vontade para fazer a sua melhoria para esta aplicação! 🎉
 
 ### Como Contribuir
 
@@ -128,7 +128,7 @@ Quer ajudar a melhorar o OpenCode Terminal? Estamos abertos a contribuições! �
 
 ### Áreas para Contribuição
 
-Sinta-se livre para trabalhar em qualquer uma das seguintes melhorias:
+Sinta-se livre para trabalhar em qualquer uma das melhorias:
 
 - **Interface do Usuário**: Melhorias visuais, novos componentes TUI, ajustes de UX
 - **Funcionalidades**: Novos comandos, integrações, melhorias de workflow
@@ -147,6 +147,8 @@ Use mensagens de commit claras e descritivas:
 - `docs: atualização de documentação`
 - `refactor: reorganização de código`
 - `test: adição de testes`
+
+- `... Sendo honesto, eu não sigo muito isso, mas é uma boa prática hahahaha`
 
 ### Setup de Desenvolvimento
 
@@ -175,19 +177,12 @@ Para trabalhar localmente:
    # Verificar problemas comuns
    ./gradlew lint 2>/dev/null || echo "Lint disponível via Android Studio"
    ```
-
-### Questions?
-
-- Abra uma issue no GitHub para perguntar ou discutir ideias
-- Entre em contato pela discussão do repositório
-- Confira a pasta `docs/` para mais instruções
+   
 
 Obrigado por contribuir para tornar o OpenCode Terminal melhor! 🚀
 
 ## 📄 Licença
 
-Projeto mantido por HyprKlavier. O ícone oficial usa o SVG do [anomalyco/opencode](https://github.com/anomalyco/opencode).
+Projeto feito por HyprKlavier como hobbie. O ícone oficial usa o SVG do [anomalyco/opencode](https://github.com/anomalyco/opencode) e, é claro, todos os créditos à equipe do Opencode pelo projeto principal que deu origem à esse subprojeto de hobbie aqui.
 
 ---
-
-**OpenCode Terminal** - Sua interface OpenCode na palma da mão.
