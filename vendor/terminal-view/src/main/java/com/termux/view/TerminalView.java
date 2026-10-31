@@ -541,6 +541,13 @@ public final class TerminalView extends View {
      * true and 0 if relativeToScroll is false.
      * @return Array with the column and row.
      */
+    // adição local: expõe a palavra na célula (col, row) para detecção de URLs
+    // ao tocar no terminal. O TerminalBuffer já implementa getWordAtLocation.
+    public String getWordAt(int column, int row) {
+        if (mEmulator == null) return null;
+        return mEmulator.getScreen().getWordAtLocation(column, row);
+    }
+
     public int[] getColumnAndRow(MotionEvent event, boolean relativeToScroll) {
         int column = (int) (event.getX() / mRenderer.mFontWidth);
         int row = (int) ((event.getY() - mRenderer.mFontLineSpacingAndAscent) / mRenderer.mFontLineSpacing);

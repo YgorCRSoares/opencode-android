@@ -29,6 +29,7 @@ public final class TermController {
     private final Activity mActivity;
     private final ViewGroup mContainer;
     private final TextView mOverlay;
+    private android.widget.LinearLayout mCopyBar;
     private final Handler mMainHandler = new Handler(Looper.getMainLooper());
 
     private TerminalSession mSession;
@@ -184,12 +185,31 @@ public final class TermController {
 
             @Override
             public void onSingleTapUp(android.view.MotionEvent e) {
-                // Ao dar toque único no terminal, exibe o teclado do sistema (IME).
-                // Usamos post() para garantir que o foco e a abertura do IME ocorram
-                // após o término do evento de toque atual.
-                if (mView != null) {
-                    mView.post(() -> showSoftKeyboard());
+                if (mView == null) return;
+                // Detecta URL no ponto tocado
+                int[] colRow = mView.getColumnAndRow(e, true);
+                if (colRow != null) {
+                    String word = mView.getWordAt(colRow[0], colRow[1]);
+                    if (word != null) {
+                        // Limpa pontuação final comum nas URLs (ponto, vírgula, parênteses)
+                        word = word.replaceAll("[.,\\)]+$", "");
+                        if (word.startsWith("www.")) {
+                            word = "https://" + word;
+                        }
+                        if (word.matches("^https?://\\S+")) {
+                            try {
+                                android.content.Intent intent = new android.content.Intent(
+                                        android.content.Intent.ACTION_VIEW, android.net.Uri.parse(word));
+                                mActivity.startActivity(intent);
+                                return; // Link aberto, não abre o IME
+                            } catch (android.content.ActivityNotFoundException ex) {
+                                android.util.Log.w(TAG, "Nenhum navegador encontrado para a URL: " + word);
+                            }
+                        }
+                    }
                 }
+                // Se não for URL, exibe o teclado do sistema (IME)
+                mView.post(() -> showSoftKeyboard());
             }
 
             @Override
@@ -214,6 +234,13 @@ public final class TermController {
 
             @Override
             public void copyModeChanged(boolean copyMode) {
+                mMainHandler.post(() -> {
+                    if (copyMode) {
+                        showCopyBar();
+                    } else {
+                        hideCopyBar();
+                    }
+                });
             }
 
             @Override
@@ -434,6 +461,47 @@ public final class TermController {
         mContainer.bringChildToFront(mOverlay);
         if (mSessionEndListener != null) {
             mSessionEndListener.run();
+        }
+    }
+
+    private void showCopyBar() {
+        if (mCopyBar != null) return;
+        mCopyBar = new android.widget.LinearLayout(mActivity);
+        mCopyBar.setOrientation(android.widget.LinearLayout.HORIZONTAL);
+        mCopyBar.setBackgroundColor(0xFF1E1E1E);
+        mCopyBar.setGravity(android.view.Gravity.CENTER);
+        int padding = Math.round(8 * mActivity.getResources().getDisplayMetrics().density);
+        mCopyBar.setPadding(padding, padding, padding, padding);
+
+        android.widget.Button btnCopy = new android.widget.Button(mActivity);
+        btnCopy.setText("Copiar");
+        btnCopy.setTextColor(0xFFFFFFFF);
+        btnCopy.setBackgroundColor(0xFF007ACC);
+        btnCopy.setOnClickListener(v -> {
+            String text = mView.getSelectedText();
+            if (text != null && !text.isEmpty()) {
+                android.content.ClipboardManager cm = (android.content.ClipboardManager)
+                        mActivity.getSystemService(Context.CLIPBOARD_SERVICE);
+                if (cm != null) {
+                    cm.setPrimaryClip(android.content.ClipData.newPlainText("terminal", text));
+                    android.widget.Toast.makeText(mActivity, "Copiado", android.widget.Toast.LENGTH_SHORT).show();
+                }
+            }
+            mView.stopTextSelectionMode();
+        });
+
+        android.widget.LinearLayout.LayoutParams lp = new android.widget.LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT);
+        mCopyBar.addView(btnCopy, lp);
+
+        mContainer.addView(mCopyBar, new FrameLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT, android.view.Gravity.TOP));
+    }
+
+    private void hideCopyBar() {
+        if (mCopyBar != null) {
+            mContainer.removeView(mCopyBar);
+            mCopyBar = null;
         }
     }
 

@@ -64,6 +64,32 @@ public class MainActivity extends Activity {
         applySystemBarAppearance();
         ContentInsets.apply(this);
 
+        // Ajusta a ExtraKeysRowView para ficar sempre grudada acima do teclado.
+        // O padding bottom do mRoot é ajustado dinamicamente com a altura do IME.
+        mRoot.setOnApplyWindowInsetsListener((v, insets) -> {
+            int imeHeight;
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+                imeHeight = insets.getInsets(android.view.WindowInsets.Type.ime()).bottom;
+            } else {
+                imeHeight = insets.getSystemWindowInsetBottom();
+            }
+
+            // Preservamos o padding original do ContentInsets (bottom) e somamos o IME.
+            // ContentInsets.apply já definiu um listener, mas o último definido vence.
+            // Precisamos garantir que os insets de sistema também sejam respeitados.
+            int systemBottom;
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+                systemBottom = insets.getInsets(android.view.WindowInsets.Type.systemBars()).bottom;
+            } else {
+                systemBottom = insets.getSystemWindowInsetBottom();
+            }
+            
+            // Se o IME estiver aberto, ele geralmente é maior que o systemBottom.
+            int finalBottom = Math.max(systemBottom, imeHeight);
+            v.setPadding(v.getPaddingLeft(), v.getPaddingTop(), v.getPaddingRight(), finalBottom);
+            return insets;
+        });
+
         if (!mStore.setupDone()) {
             startActivityForResult(new Intent(this, SetupActivity.class), REQ_SETUP);
             return;
