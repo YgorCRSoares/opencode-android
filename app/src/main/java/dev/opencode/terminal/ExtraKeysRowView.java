@@ -19,7 +19,6 @@ public class ExtraKeysRowView extends LinearLayout {
     private final TermController mController;
     private Button mBtnCtrl;
     private Button mBtnAlt;
-    private Button mBtnShift;
 
     public ExtraKeysRowView(Context context, TermController controller) {
         super(context);
@@ -40,7 +39,7 @@ public class ExtraKeysRowView extends LinearLayout {
         setFocusableInTouchMode(false);
         setDescendantFocusability(ViewGroup.FOCUS_BEFORE_DESCENDANTS);
 
-        String[] keys = {"Esc", "Ctrl", "Alt", "Shift", "Tab", "←", "↑", "↓", "→"};
+        String[] keys = {"Esc", "Ctrl", "Alt", "Modo", "←", "↑", "↓", "→"};
 
         for (String keyText : keys) {
             Button btn = new Button(context);
@@ -64,7 +63,6 @@ public class ExtraKeysRowView extends LinearLayout {
 
             if (keyText.equals("Ctrl")) mBtnCtrl = btn;
             else if (keyText.equals("Alt")) mBtnAlt = btn;
-            else if (keyText.equals("Shift")) mBtnShift = btn;
 
             btn.setOnClickListener(v -> handleKeyClick(keyText));
 
@@ -89,13 +87,9 @@ public class ExtraKeysRowView extends LinearLayout {
                 mController.setAltLatched(newAlt);
                 updateLatchVisuals();
                 break;
-            case "Shift":
-                boolean newShift = !mController.isShiftLatched();
-                mController.setShiftLatched(newShift);
-                updateLatchVisuals();
-                break;
-            case "Tab":
-                mController.write(new byte[]{0x09}, 0, 1);
+            case "Modo":
+                // Envia Shift+Tab como CSI Z (ESC [ Z)
+                mController.write(new byte[]{0x1B, 0x5B, 0x5A}, 0, 3);
                 break;
             case "←":
                 mController.sendKeyEvent(KeyEvent.KEYCODE_DPAD_LEFT);
@@ -125,9 +119,6 @@ public class ExtraKeysRowView extends LinearLayout {
         }
         if (mBtnAlt != null) {
             mBtnAlt.setBackgroundColor(mController.isAltLatched() ? 0xFF007ACC : Color.TRANSPARENT);
-        }
-        if (mBtnShift != null) {
-            mBtnShift.setBackgroundColor(mController.isShiftLatched() ? 0xFF007ACC : Color.TRANSPARENT);
         }
     }
 }

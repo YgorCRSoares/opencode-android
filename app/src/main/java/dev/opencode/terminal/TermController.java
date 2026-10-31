@@ -40,12 +40,11 @@ public final class TermController {
     private boolean mStarted;
     private volatile boolean mPtyClosed;
 
-    // Latches dos botões ExtraKeys (Ctrl/Alt/Shift): o terminal-view consulta
-    // readControlKey()/readAltKey()/readShiftKey() ao processar cada tecla, então
+    // Latches dos botões ExtraKeys (Ctrl/Alt): o terminal-view consulta
+    // readControlKey()/readAltKey() ao processar cada tecla, então
     // o estado do latch é visível lá. Zerados após compor uma tecla.
     private boolean mCtrlLatched;
     private boolean mAltLatched;
-    private boolean mShiftLatched;
 
     public TermController(Activity activity, ViewGroup container) {
         mActivity = activity;
@@ -274,9 +273,8 @@ public final class TermController {
 
             @Override
             public boolean readShiftKey() {
-                boolean val = mShiftLatched;
-                mShiftLatched = false;
-                return val;
+                // sem latch de Shift: o Modo usa shift+tab via ESC [Z
+                return false;
             }
 
             @Override
@@ -416,21 +414,12 @@ public final class TermController {
         return mAltLatched;
     }
 
-    public void setShiftLatched(boolean latched) {
-        mShiftLatched = latched;
-    }
-
-    public boolean isShiftLatched() {
-        return mShiftLatched;
-    }
-
     public void sendKeyEvent(int keyCode) {
         if (mView == null) return;
         long now = android.os.SystemClock.uptimeMillis();
         int metaState = 0;
         if (mCtrlLatched) metaState |= android.view.KeyEvent.META_CTRL_ON | android.view.KeyEvent.META_CTRL_LEFT_ON;
         if (mAltLatched) metaState |= android.view.KeyEvent.META_ALT_ON | android.view.KeyEvent.META_ALT_LEFT_ON;
-        if (mShiftLatched) metaState |= android.view.KeyEvent.META_SHIFT_ON | android.view.KeyEvent.META_SHIFT_LEFT_ON;
 
         android.view.KeyEvent downEvent = new android.view.KeyEvent(now, now, android.view.KeyEvent.ACTION_DOWN, keyCode, 0, metaState);
         android.view.KeyEvent upEvent = new android.view.KeyEvent(now, now, android.view.KeyEvent.ACTION_UP, keyCode, 0, metaState);
@@ -441,7 +430,6 @@ public final class TermController {
         // Zera os latches após compor a tecla, conforme especificado
         mCtrlLatched = false;
         mAltLatched = false;
-        mShiftLatched = false;
     }
 
     public void onResume() {
