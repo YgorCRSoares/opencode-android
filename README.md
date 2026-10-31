@@ -42,7 +42,7 @@ Se você não quer compilar, basta baixar o APK mais recente na [Release do GitH
 
 ```bash
 # Download e instalação direta:
-adb install -r [https://github.com/YgorCRSoares/opencode-android/releases/latest/download/opencode-terminal.apk](https://github.com/YgorCRSoares/opencode-android/releases/download/opencode-android-1.0/app-release.apk)
+adb install -r https://github.com/YgorCRSoares/opencode-android/releases/latest/download/opencode-terminal.apk
 ```
 
 > **Nota**: O APK da release já está assinado com a chave de debug, permitindo `install -r` sobre builds anteriores sem perder dados.
