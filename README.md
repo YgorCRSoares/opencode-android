@@ -19,6 +19,10 @@ A fully functional OpenCode TUI (Text User Interface) running on Android via Ter
 - **Mode cycling**: `Shift+Tab` replaced by single `Modo` button sending `CSI Z` (shift+tab) to cycle opencode modes
 - **No compatibility dialog**: App opens directly into TUI without the "16 KB page alignment / debuggable" warning
 
+### Icon
+- **Custom icon**: OpenCode "O" logo (official `anomalyco/opencode` `opencode-logo-dark.svg`), rasterized to 5 densities (mdpi→xxxhdpi)
+- Previously used incorrect "Z"-shaped mark; corrected to the proper "O" ring logo
+
 ### Compatibility Warning Removal
 - **Root cause**: Android flag `DEBUGGABLE` (build debug) + 16 KB ELF misalignment advisory
 - **Fix**: Release build signed with the same debug keystore → `DEBUGGABLE` flag disappears, `install -r` works without data loss (certificate digest `1642e5ea...` matches)
@@ -54,7 +58,7 @@ A fully functional OpenCode TUI (Text User Interface) running on Android via Ter
 
 ```bash
 # Build release (assembles release, signs with debug keystore)
-cd /home/HyprKlavier/opencode-android
+cd opencode-android
 ./build.sh
 
 # Install release APK (preserves data via install -r)
