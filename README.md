@@ -1,6 +1,6 @@
 # OpenCode Terminal - Android
 
-Uma TUI (Interface de Usuário em Texto) do OpenCode totalmente funcional, rodando nativamente no Android. Utilize os recursos de terminal do OpenCode diretamente do seu dispositivo Android.
+A fully functional OpenCode TUI (Text User Interface) running natively on Android. Use OpenCode's terminal features directly from your Android device.
 
 ## 📱 Sobre o Aplicativo
 
@@ -22,28 +22,39 @@ OpenCode Terminal traz a interface de linha de comando do OpenCode para o seu ce
 
 ## 🛠 Como Instalar
 
+O OpenCode Terminal pode ser instalado de duas formas:
+
+### Opção 1: Build a partir do código (recomendado para desenvolvedores)
+
+```bash
+# 1. Clonar o repositório
+git clone https://github.com/YgorCRSoares/opencode-android.git
+cd opencode-android
+
+# 2. Build e instalar
+./build.sh
+adb install -r app/build/outputs/apk/release/app-release.apk
+```
+
+### Opção 2: Download direto do APK (mais rápido para usuários)
+
+Se você não quer compilar, basta baixar o APK mais recente na [Release do GitHub](https://github.com/YgorCRSoares/opencode-android/releases):
+
+```bash
+# Download e instalação direta:
+adb install -r https://github.com/YgorCRSoares/opencode-android/releases/latest/download/opencode-terminal.apk
+```
+
+> **Nota**: O APK da release já está assinado com a chave de debug, permitindo `install -r` sobre builds anteriores sem perder dados.
+
 ### Pré-requisitos
+
 - Dispositivo Android com Termux ou ambiente similar
-- ADB (Android Debug Bridge) para instalação inicial
-- Chave SSH configurada no GitHub (opcional, para sync de chaves)
-
-### Instalação via APK
-
-1. **Build e instalar**:
-   ```bash
-   cd opencode-android
-   ./build.sh
-   adb install -r app/build/outputs/apk/release/app-release.apk
-   ```
-
-2. **Ou instalar a versão mais recente**:
-   ```bash
-   bash scripts/fetch-runtime.sh  # detecta última release automaticamente
-   ./build.sh
-   adb install -r app/build/outputs/apk/release/app-release.apk
-   ```
+- ADB (Android Debug Bridge) para instalação
+- Para a Opção 1: git e ambiente de build Android
 
 ### Primeiro Uso
+
 - Ao abrir o app, ele inicia direto na TUI (sem telas de setup obrigatórias)
 - A primeira execução pode demorar um pouco enquanto o runtime é extraído
 - Acesse comandos com `Ctrl+P` para ver a palette de comandos
@@ -56,9 +67,10 @@ Para manter o app sempre na última versão possível:
 # 1. Atualizar runtime (verifica automaticamente v1.0.3-rc3)
 bash scripts/fetch-runtime.sh
 
-# 2. Rebuild e reinstalar
+# 2. Rebuild e reinstalar (ou baixar nova release)
 ./build.sh
 adb install -r app/build/outputs/apk/release/app-release.apk
+# Ou simplesmente baixar a nova release do GitHub
 ```
 
 ## 📦 Informações do Release
@@ -77,12 +89,6 @@ No interior da TUI:
 - Links - Abrem no navegador padrão
 - `Ctrl+C` - Limpa input
 - `Ctrl+Z` - Undo no input
-
-## 📄 Licença
-
-Projeto mantido por HyprKlavier. O ícone oficial usa o SVG do [anomalyco/opencode](https://github.com/anomalyco/opencode).
-
----
 
 ## 🤝 Contribuindo
 
@@ -177,5 +183,11 @@ Para trabalhar localmente:
 - Confira a pasta `docs/` para mais instruções
 
 Obrigado por contribuir para tornar o OpenCode Terminal melhor! 🚀
+
+## 📄 Licença
+
+Projeto mantido por HyprKlavier. O ícone oficial usa o SVG do [anomalyco/opencode](https://github.com/anomalyco/opencode).
+
+---
 
 **OpenCode Terminal** - Sua interface OpenCode na palma da mão.
