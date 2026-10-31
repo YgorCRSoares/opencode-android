@@ -7,8 +7,22 @@
 set -euo pipefail
 
 # ----- Pins (não redescobrir) -----
-readonly RUNTIME_URL="https://github.com/guysoft/opencode-termux/releases/download/v1.0.3-rc3/opencode2-1.0.3rc3-android-aarch64.zip"
-readonly RUNTIME_SHA256="0725f3278cde20b39e30be1833966c67276a13829ea634f60d91f85ba3d13893"
+# Pins dinâmicos (última release incluindo prereleases ordenada por data)
+# Override por env: RUNTIME_URL / RUNTIME_SHA256
+_latest_json() {
+    curl -fsSL "https://api.github.com/repos/guysoft/opencode-termux/releases?per_page=30" | \
+        jq -r '[.[] | select(.assets[] | .name | test("opencode2-.*-android-aarch64\\.zip$"))] | sort_by(.published_at) | reverse | .[0]'
+}
+_rel_data=$(_latest_json)
+_rel_tag=$(echo "$_rel_data" | jq -r '.tag_name')
+_rel_url=$(echo "$_rel_data" | jq -r '.assets[] | select(.name | test("opencode2-.*-android-aarch64\\.zip$")) | .browser_download_url')
+_rel_zip=$(echo "$_rel_data" | jq -r '.assets[] | select(.name | test("opencode2-.*-android-aarch64\\.zip$")) | .name')
+_sums_url=$(echo "$_rel_data" | jq -r '.assets[] | select(.name == "SHA256SUMS") | .browser_download_url')
+_rel_sha=$(curl -fsSL "$_sums_url" | grep "$_rel_zip" | awk '{print $1}')
+
+readonly RUNTIME_URL="${RUNTIME_URL:-$_rel_url}"
+readonly RUNTIME_SHA256="${RUNTIME_SHA256:-$_rel_sha}"
+readonly RUNTIME_TAG="${_rel_tag}" # tag da última release detectada
 readonly RIPGREP_URL="https://packages.termux.dev/apt/termux-main/pool/main/r/ripgrep/ripgrep_15.2.0_aarch64.deb"
 readonly RIPGREP_SHA256="38e28bc297000517b24702568a483eca7dc3323eb6bdccc9033f031776bdcc6c"
 # rg é linkado contra libpcre2-8.so (RUNPATH original aponta para /data/data/com.termux,
@@ -17,9 +31,13 @@ readonly PCRE2_URL="https://packages.termux.dev/apt/termux-main/pool/main/p/pcre
 readonly PCRE2_SHA256="c27995e5f52b8ecc9b8b3e662eb08e49f82a18bfd3f34343936acc7b23964724"
 
 readonly CACHE_DIR="${XDG_CACHE_HOME:-$HOME/.cache}/opencode-android-build"
-readonly RUNTIME_CACHE="$CACHE_DIR/opencode2-1.0.3rc3-android-aarch64.zip"
+readonly RUNTIME_CACHE="$CACHE_DIR/$_rel_zip" # nome acompanha a release detectada
 readonly RIPGREP_CACHE="$CACHE_DIR/ripgrep_15.2.0_aarch64.deb"
 readonly PCRE2_CACHE="$CACHE_DIR/pcre2_10.49_aarch64.deb"
+# Stamp: registra o SHA do zip CRU da release que já foi re-empacotado em
+# OUTPUT_ZIP. Como o zip embarcado é re-empacotado (5 entradas), seu SHA nunca
+# é igual ao da release — comparamos via este stamp.
+readonly RUNTIME_STAMP="$CACHE_DIR/runtime-embedded.sha"
 
 PROJECT_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 readonly PROJECT_ROOT
@@ -27,6 +45,25 @@ OUTPUT_ZIP="$PROJECT_ROOT/app/src/main/assets/runtime-arm64.zip"
 readonly OUTPUT_ZIP
 JNI_DIR="$PROJECT_ROOT/app/src/main/jniLibs/arm64-v8a"
 readonly JNI_DIR
+MAIN_ACTIVITY="$PROJECT_ROOT/app/src/main/java/dev/opencode/terminal/MainActivity.java"
+readonly MAIN_ACTIVITY
+
+# ----- Modo --check: só informa, zero efeito colateral -----
+# Compara a release detectada (via GitHub) com o stamp de qual release foi
+# re-empacotada no zip embarcado. Não mexe em nada.
+if [[ "${1:-}" == "--check" ]]; then
+    _packed_sha=""
+    [[ -f "$RUNTIME_STAMP" ]] && _packed_sha=$(cat "$RUNTIME_STAMP")
+    printf '[fetch-runtime] Última release do fork: %s\n' "$RUNTIME_TAG" >&2
+    printf '[fetch-runtime] SHA da release:         %s\n' "$RUNTIME_SHA256" >&2
+    printf '[fetch-runtime] Release já embutida:    %s\n' "${_packed_sha:-<nenhuma>}" >&2
+    if [[ -n "$_packed_sha" && "$_packed_sha" == "$RUNTIME_SHA256" ]]; then
+        printf '[fetch-runtime] já está na última versão possível (%s); nada a fazer\n' "$RUNTIME_TAG" >&2
+    else
+        printf '[fetch-runtime] há atualização disponível (%s) — rode sem --check para aplicar\n' "$RUNTIME_TAG" >&2
+    fi
+    exit 0
+fi
 
 STAGING_DIR="$(mktemp -d)"
 readonly STAGING_DIR
@@ -90,6 +127,13 @@ command -v readelf >/dev/null 2>&1 || { log "readelf is required"; exit 1; }
 command -v patchelf >/dev/null 2>&1 || { log "patchelf is required (rg RUNPATH rewrite)"; exit 1; }
 
 mkdir -p "$CACHE_DIR"
+# No-op: se o stamp indica que esta release EXATA já foi re-empacotada no zip
+# embarcado, não há nada a fazer (evita re-download/repack/bump a cada execução).
+if [[ -f "$RUNTIME_STAMP" && "$(cat "$RUNTIME_STAMP")" == "$RUNTIME_SHA256" ]]; then
+    log "runtime já está na última versão ($RUNTIME_TAG); nada a fazer"
+    exit 0
+fi
+
 download_pinned "$RUNTIME_URL" "$RUNTIME_SHA256" "$RUNTIME_CACHE"
 download_pinned "$RIPGREP_URL" "$RIPGREP_SHA256" "$RIPGREP_CACHE"
 download_pinned "$PCRE2_URL" "$PCRE2_SHA256" "$PCRE2_CACHE"
@@ -290,6 +334,32 @@ if ! LC_ALL=C readelf -d "$REEXTRACT_DIR/bin/rg" | grep -q 'libpcre2-8\.so'; the
     log "re-extracted rg does not NEED libpcre2-8.so" >&2
     exit 1
 fi
+
+# Bump do RUNTIME_MARKER_VERSION só aqui: depois do novo runtime validado e
+# re-empacotado. Gatilha re-extração do runtime no dispositivo na próxima
+# instalação. Se o script falhar antes, o marker não vira (evita bump duplo).
+if [[ -f "$MAIN_ACTIVITY" ]]; then
+    log "Fazendo bump de RUNTIME_MARKER_VERSION em MainActivity.java"
+    python3 -c '
+import re
+path = "'"$MAIN_ACTIVITY"'"
+with open(path, "r") as f:
+    content = f.read()
+# Incrementa o número do marker (ex: 1.1 -> 1.2, ou 1.2 -> 1.3)
+def bump(m):
+    prefix = m.group(1)
+    num = float(m.group(2))
+    return prefix + "{0:.1f}".format(num + 0.1)
+new_content = re.sub(r"(RUNTIME_MARKER_VERSION\s*=\s*\")([0-9.]+)", bump, content)
+with open(path, "w") as f:
+    f.write(new_content)
+'
+    log "RUNTIME_MARKER_VERSION agora: $(grep -o 'RUNTIME_MARKER_VERSION = "[0-9.]*"' "$MAIN_ACTIVITY")"
+fi
+
+# Registra no stamp que esta release exata foi embutida (habilita no-op futuro).
+printf '%s\n' "$RUNTIME_SHA256" >"$RUNTIME_STAMP"
+log "stamp gravado: $RUNTIME_STAMP"
 
 log "OK: 5 zip entries + 4 native-lib executables, aarch64, bionic-only rg, pcre2 sidecar + RUNPATH \$ORIGIN"
 log "bsdtar -tf:"
