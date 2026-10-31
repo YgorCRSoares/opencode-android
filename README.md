@@ -84,4 +84,98 @@ Projeto mantido por HyprKlavier. O ícone oficial usa o SVG do [anomalyco/openco
 
 ---
 
+## 🤝 Contribuindo
+
+Quer ajudar a melhorar o OpenCode Terminal? Estamos abertos a contribuições! 🎉
+
+### Como Contribuir
+
+1. **Fork o repositório**  
+   ```bash
+   git fork https://github.com/YgorCRSoares/opencode-android.git
+   ```
+
+2. **Crie uma branch para sua feature**  
+   ```bash
+   git checkout -b feature/nova-funcionalidade
+   ```
+
+3. **Faça suas alterações e testes**  
+   - Siga o estilo de código existente
+   - Atualize o README se necessário
+   - Teste em dispositivo real sempre que possível
+
+4. **Commit suas mudanças**  
+   ```bash
+   git commit -m "feat: descrição da funcionalidade"
+   ```
+
+5. **Envie para o fork**  
+   ```bash
+   git push origin feature/nova-funcionalidade
+   ```
+
+6. **Abra um Pull Request**  
+   - Preencha o template do PR
+   - Descreva o problema/funcionalidade
+   - Inclua screenshots se aplicável
+
+### Áreas para Contribuição
+
+Sinta-se livre para trabalhar em qualquer uma das seguintes melhorias:
+
+- **Interface do Usuário**: Melhorias visuais, novos componentes TUI, ajustes de UX
+- **Funcionalidades**: Novos comandos, integrações, melhorias de workflow
+- **Performance**: Otimização do runtime, redução de tamanho do APK
+- **Documentação**: Atualização do README, exemplos, tutoriais
+- **Correções de Bug**: Problemas reportados, melhoria de estabilidade
+- **Build/CI**: Melhorias no `build.sh`, `fetch-runtime.sh`, automação
+- **Testing**: Testes unitários, testes em dispositivo, cobertura de cobertura
+
+### Guia de Commits
+
+Use mensagens de commit claras e descritivas:
+
+- `feat: nova funcionalidade`
+- `fix: correção de bug`
+- `docs: atualização de documentação`
+- `refactor: reorganização de código`
+- `test: adição de testes`
+
+### Setup de Desenvolvimento
+
+Para trabalhar localmente:
+
+1. **Clonar o repositório**
+   ```bash
+   git clone https://github.com/YgorCRSoares/opencode-android.git
+   cd opencode-android
+   ```
+
+2. **Ambiente Android**
+   - Android Studio instalado
+   - `ANDROID_HOME` e `JAVA_HOME` configurados
+   - Dispositivo ou emulador com Android 8.0+
+
+3. **Build e testes**
+   ```bash
+   ./build.sh          # build release
+   adb install -r      # instalar no dispositivo
+   # Testar funcionalidades manualmente
+   ```
+
+4. **Lint e qualidade**
+   ```bash
+   # Verificar problemas comuns
+   ./gradlew lint 2>/dev/null || echo "Lint disponível via Android Studio"
+   ```
+
+### Questions?
+
+- Abra uma issue no GitHub para perguntar ou discutir ideias
+- Entre em contato pela discussão do repositório
+- Confira a pasta `docs/` para mais instruções
+
+Obrigado por contribuir para tornar o OpenCode Terminal melhor! 🚀
+
 **OpenCode Terminal** - Sua interface OpenCode na palma da mão.
