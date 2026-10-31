@@ -58,7 +58,7 @@ A fully functional OpenCode TUI (Text User Interface) running on Android via Ter
 
 ```bash
 # Build release (assembles release, signs with debug keystore)
-cd /home/HyprKlavier/opencode-android
+cd opencode-android
 ./build.sh
 
 # Install release APK (preserves data via install -r)
