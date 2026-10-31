@@ -12,4 +12,7 @@ echo "cwd=$(pwd)"
 echo "settings presente: $(ls settings.gradle.kts)"
 echo "java=$("$JAVA_HOME/bin/java" -version 2>&1 | head -1)"
 
-gradle assembleDebug 2>&1 | tee /home/HyprKlavier/opencode-android/build.log
+# assembleRelease (não-depurável): remove o aviso de compatibilidade de 16 KB
+# que o Android só exibe a apps depuráveis. Assinado com a chave de debug
+# (ver app/build.gradle.kts) para permitir install -r sem perder dados.
+gradle assembleRelease 2>&1 | tee /home/HyprKlavier/opencode-android/build.log

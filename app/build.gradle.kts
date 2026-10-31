@@ -55,6 +55,11 @@ android {
     buildTypes {
         release {
             isMinifyEnabled = false
+            // Sideload pessoal: assina release com a MESMA chave de debug para
+            // permitir `install -r` por cima do build debug sem perder dados.
+            // O efeito desejado é sair de DEBUGGABLE (remove o aviso de
+            // compatibilidade de 16 KB que o Android só mostra a apps depuráveis).
+            signingConfig = signingConfigs.getByName("debug")
         }
     }
 }
