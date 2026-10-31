@@ -39,6 +39,13 @@ public final class TermController {
     private boolean mStarted;
     private volatile boolean mPtyClosed;
 
+    // Latches dos botões ExtraKeys (Ctrl/Alt/Shift): o terminal-view consulta
+    // readControlKey()/readAltKey()/readShiftKey() ao processar cada tecla, então
+    // o estado do latch é visível lá. Zerados após compor uma tecla.
+    private boolean mCtrlLatched;
+    private boolean mAltLatched;
+    private boolean mShiftLatched;
+
     public TermController(Activity activity, ViewGroup container) {
         mActivity = activity;
         mContainer = container;
@@ -177,6 +184,12 @@ public final class TermController {
 
             @Override
             public void onSingleTapUp(android.view.MotionEvent e) {
+                // Ao dar toque único no terminal, exibe o teclado do sistema (IME).
+                // Usamos post() para garantir que o foco e a abertura do IME ocorram
+                // após o término do evento de toque atual.
+                if (mView != null) {
+                    mView.post(() -> showSoftKeyboard());
+                }
             }
 
             @Override
@@ -220,17 +233,23 @@ public final class TermController {
 
             @Override
             public boolean readControlKey() {
-                return false;
+                boolean val = mCtrlLatched;
+                mCtrlLatched = false;
+                return val;
             }
 
             @Override
             public boolean readAltKey() {
-                return false;
+                boolean val = mAltLatched;
+                mAltLatched = false;
+                return val;
             }
 
             @Override
             public boolean readShiftKey() {
-                return false;
+                boolean val = mShiftLatched;
+                mShiftLatched = false;
+                return val;
             }
 
             @Override
@@ -348,8 +367,54 @@ public final class TermController {
         InputMethodManager imm = (InputMethodManager)
                 mActivity.getSystemService(Context.INPUT_METHOD_SERVICE);
         if (imm != null) {
-            imm.showSoftInput(mView, InputMethodManager.SHOW_IMPLICIT);
+            // Usamos 0 (sem flags como SHOW_IMPLICIT) para garantir que o teclado do sistema
+            // abra de forma confiável ao tocar no terminal ou interagir com a fila de teclas extras.
+            imm.showSoftInput(mView, 0);
         }
+    }
+
+    public void setCtrlLatched(boolean latched) {
+        mCtrlLatched = latched;
+    }
+
+    public boolean isCtrlLatched() {
+        return mCtrlLatched;
+    }
+
+    public void setAltLatched(boolean latched) {
+        mAltLatched = latched;
+    }
+
+    public boolean isAltLatched() {
+        return mAltLatched;
+    }
+
+    public void setShiftLatched(boolean latched) {
+        mShiftLatched = latched;
+    }
+
+    public boolean isShiftLatched() {
+        return mShiftLatched;
+    }
+
+    public void sendKeyEvent(int keyCode) {
+        if (mView == null) return;
+        long now = android.os.SystemClock.uptimeMillis();
+        int metaState = 0;
+        if (mCtrlLatched) metaState |= android.view.KeyEvent.META_CTRL_ON | android.view.KeyEvent.META_CTRL_LEFT_ON;
+        if (mAltLatched) metaState |= android.view.KeyEvent.META_ALT_ON | android.view.KeyEvent.META_ALT_LEFT_ON;
+        if (mShiftLatched) metaState |= android.view.KeyEvent.META_SHIFT_ON | android.view.KeyEvent.META_SHIFT_LEFT_ON;
+
+        android.view.KeyEvent downEvent = new android.view.KeyEvent(now, now, android.view.KeyEvent.ACTION_DOWN, keyCode, 0, metaState);
+        android.view.KeyEvent upEvent = new android.view.KeyEvent(now, now, android.view.KeyEvent.ACTION_UP, keyCode, 0, metaState);
+
+        mView.onKeyDown(keyCode, downEvent);
+        mView.onKeyUp(keyCode, upEvent);
+
+        // Zera os latches após compor a tecla, conforme especificado
+        mCtrlLatched = false;
+        mAltLatched = false;
+        mShiftLatched = false;
     }
 
     public void onResume() {

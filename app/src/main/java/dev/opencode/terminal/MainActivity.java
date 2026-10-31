@@ -189,12 +189,12 @@ public class MainActivity extends Activity {
                     LinearLayout.LayoutParams.WRAP_CONTENT));
         }
 
-        // Teclado QWERTY próprio (substitui a ExtraKeysView): abaixo do
-        // terminal, nunca sobreposto — o TUI usa a última linha para
+        // Fila de teclas extras (Esc, Ctrl, Alt, Shift, Tab, setas): abaixo
+        // do terminal, nunca sobreposto — o TUI usa a última linha para
         // status/entrada e a linha de teclas não pode escondê-la. A altura
-        // fixa do teclado entra no layout; o PTY recebe a altura reduzida do
+        // fixa da fila entra no layout; o PTY recebe a altura reduzida do
         // EmulatorView no onSizeChanged (mContainer tem weight=1).
-        IKeyboardView keyboard = new IKeyboardView(this, mTerm);
+        ExtraKeysRowView keyboard = new ExtraKeysRowView(this, mTerm);
         LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT,
                 LinearLayout.LayoutParams.WRAP_CONTENT);
