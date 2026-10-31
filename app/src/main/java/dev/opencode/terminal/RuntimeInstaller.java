@@ -10,6 +10,8 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipInputStream;
+import java.nio.file.Path;
+import java.nio.file.Paths;
 
 /**
  * Extrai o zip de runtime para o diretório de arquivos do app, gravando um marker
@@ -59,6 +61,37 @@ public final class RuntimeInstaller {
     public static InstallResult install(File baseDir, InputStream zip, long totalBytes,
             String version, ProgressListener listener) throws IOException {
         File marker = new File(baseDir, MARKER_NAME);
+        
+        // --- CRIAR CONFIG DO TUI SEMPRE QUE POSSÍVEL ---
+        // Isso deve acontecer independente de ser extração nova ou UPTODATE,
+        // para garantir que o mini.footer "hide" esteja sempre presente.
+        try {
+            File configDir = new File(baseDir, ".config");
+            if (!configDir.isDirectory() && !configDir.mkdirs()) {
+                // continua mesmo se não conseguir criar o diretório
+            }
+            File opencodeConfigDir = new File(configDir, "opencode");
+            if (!opencodeConfigDir.isDirectory() && !opencodeConfigDir.mkdirs()) {
+                // continua mesmo se não conseguir criar
+            }
+            File tuiConfigFile = new File(opencodeConfigDir, "opencode.jsonc");
+            if (!tuiConfigFile.exists()) {
+                tuiConfigFile.createNewFile();
+                try (BufferedOutputStream out = new BufferedOutputStream(
+                        new FileOutputStream(tuiConfigFile))) {
+                    String json = "{\n"
+                            + "  \"mini\": {\n"
+                            + "    \"footer\": \"hide\"\n"
+                            + "  }\n"
+                            + "}";
+                    out.write(json.getBytes(StandardCharsets.UTF_8));
+                }
+            }
+        } catch (IOException e) {
+            // Falha ao criar config é não-crítico; o TUI usaráDefaults
+        }
+        // ------------------------------------------------
+        
         if (marker.isFile() && version.equals(readMarker(marker))) {
             ensureExecutables(baseDir);
             return InstallResult.UPTODATE;
@@ -66,6 +99,7 @@ public final class RuntimeInstaller {
 
         extractAll(baseDir, zip, totalBytes, listener);
         ensureExecutables(baseDir);
+
         writeMarker(marker, version);
         return InstallResult.EXTRACTED;
     }
