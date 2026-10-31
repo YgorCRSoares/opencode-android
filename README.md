@@ -1,6 +1,6 @@
 # OpenCode Terminal - Android
 
-A fully functional OpenCode TUI (Text User Interface) running natively on Android. Use OpenCode's terminal features directly from your Android device.
+Uma TUI (Interface de Usuário em Texto) do OpenCode totalmente funcional, rodando nativamente no Android. Utilize os recursos de terminal do OpenCode diretamente do seu dispositivo Android.
 
 ## 📱 Sobre o Aplicativo
 
